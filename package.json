@@ -1,13 +1,32 @@
 {
   "name": "microbit-micropython",
   "displayName": "micro:bit MicroPython",
-  "description": "MicroPython support for the BBC micro:bit",
-  "version": "0.0.1",
+  "description": "Flash MicroPython to a BBC micro:bit over WebUSB, with a serial REPL. Works in the browser and on desktop, with no install.",
+  "version": "0.1.0",
+  "publisher": "carlosperate",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/carlosperate/vscode-microbit-micropython.git"
+  },
+  "bugs": {
+    "url": "https://github.com/carlosperate/vscode-microbit-micropython/issues"
+  },
+  "homepage": "https://github.com/carlosperate/vscode-microbit-micropython#readme",
   "engines": {
     "vscode": "^1.91.0"
   },
   "categories": [
+    "Education",
     "Other"
+  ],
+  "keywords": [
+    "microbit",
+    "micropython",
+    "python",
+    "webusb",
+    "embedded",
+    "repl"
   ],
   "activationEvents": [],
   "browser": "./dist/extension.js",
