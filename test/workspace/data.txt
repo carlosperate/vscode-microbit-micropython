@@ -1,0 +1,5 @@
+A non-Python file at the workspace root.
+
+The device filesystem holds any file, not only .py, so this one must be flashed
+alongside main.py. If it goes missing, file selection has started filtering on
+extension.

@@ -4,13 +4,13 @@
   "description": "MicroPython support for the BBC micro:bit",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.134.0"
+    "vscode": "^1.91.0"
   },
   "categories": [
     "Other"
   ],
   "activationEvents": [],
-  "browser": "./dist/web/extension.js",
+  "browser": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
@@ -20,35 +20,21 @@
     ]
   },
   "scripts": {
-    "test": "vscode-test-web --browserType=chromium --extensionDevelopmentPath=. --extensionTestsPath=dist/web/test/suite/extensionTests.js",
-    "pretest": "npm run compile-web",
-    "vscode:prepublish": "npm run package-web",
-    "compile-web": "npm run check-types && npm run lint && node esbuild.js",
-    "watch-web": "npm-run-all -p watch-web:*",
-    "watch-web:esbuild": "node esbuild.js --watch",
-    "watch-web:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "package-web": "npm run check-types && npm run lint && node esbuild.js --production",
-    "check-types": "tsc --noEmit",
-    "lint": "eslint src",
-    "run-in-browser": "vscode-test-web --browserType=chromium --extensionDevelopmentPath=. ."
+    "build": "node config/esbuild.config.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config config/vitest.config.mts",
+    "test:watch": "vitest --config config/vitest.config.mts",
+    "serve": "npm run build && vscode-test-web --browser=none --port=3000 --extensionDevelopmentPath=. ./test/workspace",
+    "chrome": "npm run build && vscode-test-web --browser=chromium --extensionDevelopmentPath=. ./test/workspace",
+    "desktop": "npm run build && node config/desktop.mjs"
   },
   "devDependencies": {
-    "@types/vscode": "^1.134.0",
-    "@types/mocha": "^10.0.10",
-    "@types/assert": "^1.5.11",
-    "eslint": "^10.5.0",
-    "typescript-eslint": "^8.61.1",
-    "mocha": "^11.7.6",
-    "typescript": "^6.0.3",
+    "@types/node": "^24.10.1",
+    "@types/vscode": "^1.91.0",
+    "@vscode/test-electron": "^3.1.0",
     "@vscode/test-web": "^0.0.81",
     "esbuild": "^0.28.1",
-    "glob": "^13.0.6",
-    "npm-run-all": "^4.1.5",
-    "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
-    "assert": "^2.1.0"
-  },
-  "overrides": {
-    "diff": "^8.0.4",
-    "serialize-javascript": "^7.0.6"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
   }
 }

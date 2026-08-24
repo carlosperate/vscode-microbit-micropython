@@ -1,6 +1,6 @@
-out
-dist
-node_modules
+node_modules/
+dist/
 .vscode-test-web/
+.vscode-test/
 *.vsix
 .env
