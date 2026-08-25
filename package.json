@@ -28,23 +28,54 @@
     "embedded",
     "repl"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "browser": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "microbit-micropython.helloWorld",
-        "title": "Hello World"
+        "command": "microbit-micropython.flash",
+        "title": "Flash",
+        "category": "micro:bit MicroPython"
+      },
+      {
+        "command": "microbit-micropython.saveHex",
+        "title": "Save Hex",
+        "category": "micro:bit MicroPython"
+      },
+      {
+        "command": "microbit-micropython.connect",
+        "title": "Connect",
+        "category": "micro:bit MicroPython"
+      },
+      {
+        "command": "microbit-micropython.disconnect",
+        "title": "Disconnect",
+        "category": "micro:bit MicroPython"
+      },
+      {
+        "command": "microbit-micropython.openTerminal",
+        "title": "Open Serial Terminal",
+        "category": "micro:bit MicroPython"
+      },
+      {
+        "command": "microbit-micropython.resetBoard",
+        "title": "Reset Board",
+        "category": "micro:bit MicroPython"
       }
     ]
   },
   "scripts": {
     "build": "node config/esbuild.config.mjs",
+    "build:integration": "esbuild test/integration/index.ts --bundle --outfile=test/integration/dist/index.js --format=cjs --platform=browser --external:vscode --log-level=warning",
     "typecheck": "tsc --noEmit && tsc --noEmit -p test",
     "test": "vitest run --config config/vitest.config.mts",
     "test:watch": "vitest --config config/vitest.config.mts",
-    "serve": "npm run build && vscode-test-web --browser=none --port=3000 --extensionDevelopmentPath=. ./test/workspace",
-    "chrome": "npm run build && vscode-test-web --browser=chromium --extensionDevelopmentPath=. ./test/workspace",
+    "test:integration": "npm run build && npm run build:integration && vscode-test-web --quality stable --headless --extensionDevelopmentPath=. --extensionTestsPath=./test/integration/dist/index.js ./test/workspace",
+    "test:integration:desktop": "npm run build && npm run build:integration && node config/desktop.mjs --test",
+    "serve": "npm run build && vscode-test-web --quality stable --browser=none --port=3000 --extensionDevelopmentPath=. ./test/workspace",
+    "chrome": "npm run build && vscode-test-web --quality stable --browser=chromium --extensionDevelopmentPath=. ./test/workspace",
     "desktop": "npm run build && node config/desktop.mjs"
   },
   "devDependencies": {

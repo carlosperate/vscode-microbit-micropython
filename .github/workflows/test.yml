@@ -6,10 +6,21 @@ on:
   pull_request:
     branches: "*"
 
+permissions:
+  contents: read
+
 jobs:
   build-test:
-    name: Build & test
-    runs-on: ubuntu-latest
+    name: Build & test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          # Linux has no display, so running desktop VS Code needs xvfb.
+          - os: ubuntu-latest
+            xvfb: xvfb-run -a
     steps:
       - uses: actions/checkout@v7
 
@@ -26,3 +37,9 @@ jobs:
       - run: npm run build
 
       - run: npm test
+
+      - name: Integration tests, VS Code Web
+        run: npm run test:integration
+
+      - name: Integration tests, desktop VS Code
+        run: ${{ matrix.xvfb }} npm run test:integration:desktop
