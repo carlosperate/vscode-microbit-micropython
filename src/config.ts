@@ -18,6 +18,12 @@ export const COMMANDS = {
 
 export type CommandId = (typeof COMMANDS)[keyof typeof COMMANDS];
 
+/** The settings section, and the keys inside it, as the manifest declares them. */
+export const SECTION = 'microbit-micropython';
+export const SETTINGS = {
+	filesExclude: 'files.exclude',
+} as const;
+
 /**
  * The user-facing name, and it always carries MicroPython. This is not a generic
  * micro:bit extension: the board is also programmed in C++ and MakeCode, and the
@@ -28,6 +34,3 @@ export type CommandId = (typeof COMMANDS)[keyof typeof COMMANDS];
  * is what VS Code renders as the `micro:bit MicroPython: ` palette prefix.
  */
 export const PRODUCT = 'micro:bit MicroPython';
-
-/** What the output channel is called in the Output panel's dropdown. */
-export const OUTPUT_CHANNEL = PRODUCT;

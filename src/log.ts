@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-import { OUTPUT_CHANNEL } from './config';
+import { PRODUCT } from './config';
 
 /**
  * The one output channel, and the instrument to reach for when something goes
@@ -14,7 +14,7 @@ import { OUTPUT_CHANNEL } from './config';
 let channel: vscode.OutputChannel | undefined;
 
 export function createLog(context: vscode.ExtensionContext): void {
-	channel = vscode.window.createOutputChannel(OUTPUT_CHANNEL);
+	channel = vscode.window.createOutputChannel(PRODUCT);
 	context.subscriptions.push(channel, {
 		dispose: () => {
 			channel = undefined;

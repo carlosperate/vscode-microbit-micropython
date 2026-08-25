@@ -5,6 +5,34 @@
   "version": "0.1.0",
   "publisher": "carlosperate",
   "license": "MIT",
+  "scripts": {
+    "build": "node config/esbuild.config.mjs",
+    "build:integration": "esbuild test/integration/index.ts --bundle --outfile=test/integration/dist/index.js --format=cjs --platform=browser --main-fields=module,browser,main --external:vscode --log-level=warning",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test",
+    "test": "vitest run --config config/vitest.config.mts",
+    "test:watch": "vitest --config config/vitest.config.mts",
+    "test:integration": "npm run build && npm run build:integration && vscode-test-web --quality stable --headless --extensionDevelopmentPath=. --extensionTestsPath=./test/integration/dist/index.js ./test/workspace",
+    "test:integration:desktop": "npm run build && npm run build:integration && node config/desktop.mjs --test",
+    "serve": "npm run build && vscode-test-web --quality stable --browser=none --port=3000 --extensionDevelopmentPath=. ./test/workspace",
+    "chrome": "npm run build && vscode-test-web --quality stable --browser=chromium --extensionDevelopmentPath=. ./test/workspace",
+    "desktop": "npm run build && node config/desktop.mjs"
+  },
+  "dependencies": {
+    "@microbit/microbit-fs": "0.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/vscode": "^1.91.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/test-web": "^0.0.81",
+    "esbuild": "^0.28.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "browser": "./dist/extension.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/carlosperate/vscode-microbit-micropython.git"
@@ -13,9 +41,6 @@
     "url": "https://github.com/carlosperate/vscode-microbit-micropython/issues"
   },
   "homepage": "https://github.com/carlosperate/vscode-microbit-micropython#readme",
-  "engines": {
-    "vscode": "^1.91.0"
-  },
   "categories": [
     "Education",
     "Other"
@@ -25,14 +50,25 @@
     "micropython",
     "python",
     "webusb",
-    "embedded",
-    "repl"
+    "embedded"
   ],
   "activationEvents": [
     "onStartupFinished"
   ],
-  "browser": "./dist/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "micro:bit MicroPython",
+      "properties": {
+        "microbit-micropython.files.exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Glob patterns for files in the workspace root to keep off the micro:bit, for example `notes.txt` or `*.md`. Files in subfolders are never included: the micro:bit filesystem has no directories."
+        }
+      }
+    },
     "commands": [
       {
         "command": "microbit-micropython.flash",
@@ -65,26 +101,5 @@
         "category": "micro:bit MicroPython"
       }
     ]
-  },
-  "scripts": {
-    "build": "node config/esbuild.config.mjs",
-    "build:integration": "esbuild test/integration/index.ts --bundle --outfile=test/integration/dist/index.js --format=cjs --platform=browser --external:vscode --log-level=warning",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p test",
-    "test": "vitest run --config config/vitest.config.mts",
-    "test:watch": "vitest --config config/vitest.config.mts",
-    "test:integration": "npm run build && npm run build:integration && vscode-test-web --quality stable --headless --extensionDevelopmentPath=. --extensionTestsPath=./test/integration/dist/index.js ./test/workspace",
-    "test:integration:desktop": "npm run build && npm run build:integration && node config/desktop.mjs --test",
-    "serve": "npm run build && vscode-test-web --quality stable --browser=none --port=3000 --extensionDevelopmentPath=. ./test/workspace",
-    "chrome": "npm run build && vscode-test-web --quality stable --browser=chromium --extensionDevelopmentPath=. ./test/workspace",
-    "desktop": "npm run build && node config/desktop.mjs"
-  },
-  "devDependencies": {
-    "@types/node": "^24.10.1",
-    "@types/vscode": "^1.91.0",
-    "@vscode/test-electron": "^3.1.0",
-    "@vscode/test-web": "^0.0.81",
-    "esbuild": "^0.28.1",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.11"
   }
 }

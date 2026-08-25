@@ -1,8 +1,21 @@
 import * as vscode from 'vscode';
 
-import { COMMANDS, PRODUCT } from './config';
+import { flash } from './commands/flash';
+import { COMMANDS, PRODUCT, type CommandId } from './config';
 import { createLog, log } from './log';
 import { createStatusBar } from './ui/statusbar';
+
+/**
+ * Commands with an implementation. The rest answer with the stub below.
+ *
+ * Keyed on `CommandId` rather than `string`, so a mistyped id is a compile
+ * error. Spelled wrong it would simply never match, leaving the command to
+ * answer "not implemented yet" forever, and nothing else would notice: the
+ * integration check only asserts that every contributed id is registered.
+ */
+const IMPLEMENTED: Partial<Record<CommandId, (context: vscode.ExtensionContext) => Promise<void>>> = {
+	[COMMANDS.flash]: flash,
+};
 
 export function activate(context: vscode.ExtensionContext): void {
 	createLog(context);
@@ -16,9 +29,11 @@ export function activate(context: vscode.ExtensionContext): void {
 	// would drift the moment one is reworded.
 	const titles = contributedTitles(context);
 	for (const id of Object.values(COMMANDS)) {
+		const implementation = IMPLEMENTED[id];
 		context.subscriptions.push(
-			vscode.commands.registerCommand(id, () => {
-				log(`${id} is not implemented yet`);
+			vscode.commands.registerCommand(id, async () => {
+				log(`Running ${id}`);
+				if (implementation) return implementation(context);
 				void vscode.window.showInformationMessage(`${PRODUCT}: ${titles.get(id) ?? id} is not implemented yet.`);
 			})
 		);

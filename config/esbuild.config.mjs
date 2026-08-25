@@ -26,6 +26,9 @@ export function getBuildOptions(outDir = root) {
 		platform: 'browser',
 		target: 'es2020',
 		external: ['vscode'],
+		// Prefer `module` over `browser`: a UMD `browser` build assigns to
+		// `global`, which the Web Worker doesn't have.
+		mainFields: ['module', 'browser', 'main'],
 		// Never shipped: .vscodeignore drops every .map from the VSIX.
 		sourcemap: true,
 		logLevel: 'warning',

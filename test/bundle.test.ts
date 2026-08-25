@@ -43,13 +43,18 @@ it('leaves vscode external and pulls in nothing else at runtime', () => {
  *
  * A hit here is a bug even when it comes from a string a user reads. Rename the
  * string, do not loosen the pattern.
+ *
+ * The dotted three require a property name after the dot, because that is what
+ * reading a global looks like and a full stop ending an English sentence is not.
+ * esbuild keeps a dependency's doc comments in the output, and one of them ends
+ * "discards the IDs in the process."
  */
 const nodeGlobals = [
-	/\bprocess\s*\./,
-	/\bBuffer\s*\./,
+	/\bprocess\s*\.\w/,
+	/\bBuffer\s*\.\w/,
 	/\b__dirname\b/,
 	/\b__filename\b/,
-	/\bglobal\./,
+	/\bglobal\.\w/,
 	/\bsetImmediate\s*\(/,
 ];
 
