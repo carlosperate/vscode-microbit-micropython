@@ -1,7 +1,7 @@
 {
   "name": "microbit-micropython",
   "displayName": "micro:bit MicroPython",
-  "description": "Flash MicroPython to a BBC micro:bit over WebUSB, with a serial REPL. Works in the browser and on desktop, with no install.",
+  "description": "Build and flash a MicroPython project to a BBC micro:bit over WebUSB, with a serial REPL.",
   "version": "0.1.0",
   "publisher": "carlosperate",
   "license": "MIT",
