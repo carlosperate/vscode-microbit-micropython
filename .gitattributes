@@ -1,0 +1,3 @@
+# Intel and Universal hex is ASCII with LF endings, and git could change the
+# line endings based on each user config. Treat them as binary.
+*.hex -text

@@ -40,7 +40,7 @@
   },
   "scripts": {
     "build": "node config/esbuild.config.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test",
     "test": "vitest run --config config/vitest.config.mts",
     "test:watch": "vitest --config config/vitest.config.mts",
     "serve": "npm run build && vscode-test-web --browser=none --port=3000 --extensionDevelopmentPath=. ./test/workspace",

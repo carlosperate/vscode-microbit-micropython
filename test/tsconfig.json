@@ -1,0 +1,14 @@
+{
+	// Tests run in Node under vitest, the extension runs in a Web Worker. Only
+	// this half gets node's types: in `src/` they would make `process`, `Buffer`
+	// and `__dirname` compile and then throw at runtime, and they retype
+	// `setTimeout` to return `NodeJS.Timeout` instead of a number.
+	//
+	// It sits in test/ rather than the repo root so an editor picks it up too:
+	// tsserver uses the nearest tsconfig above the file it is checking.
+	"extends": "../tsconfig.json",
+	"compilerOptions": {
+		"types": ["vscode", "node"]
+	},
+	"include": ["**/*.ts"]
+}
