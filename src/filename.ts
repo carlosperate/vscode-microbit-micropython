@@ -40,8 +40,7 @@ const RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)(\.|$)/i;
  */
 export function hexFilename(folderName: string): string {
 	const cleaned = folderName
-		// Control and format characters. FAT has no encoding for them, and they
-		// are invisible, so a name carrying one looks fine and will not save.
+		// Control and format characters: invisible, and illegal on FAT.
 		.replace(/\p{C}+/gu, '-')
 		// The nine characters FAT reserves in a long name.
 		.replace(/[\\/:*?"<>|]+/g, '-')
@@ -50,17 +49,16 @@ export function hexFilename(folderName: string): string {
 		// One dash per run, whichever of the three above left them.
 		.replace(/-{2,}/g, '-');
 
-	// By code point, so the cut never lands inside an emoji and keeps half of one,
-	// and against the room the extension leaves rather than the whole budget.
+	// By code point, or the cut keeps half an emoji. Extension inside the budget.
 	const short = [...cleaned].slice(0, MAX_FILENAME - EXTENSION.length).join('');
 
-	// A leading dot hides the file on every Unix, FAT strips a trailing dot in
-	// silence, and the cut above can land on a separator of its own.
+	// A leading dot hides the file; FAT strips a trailing one; the cut leaves them.
 	const stem = short.replace(/^[-.]+|[-.]+$/g, '');
 
-	// Last, on the name as it will really be written: the trim just above turns
-	// `con-` into a bare `con`, so a check made any earlier misses it.
-	if (RESERVED.test(stem)) return `microbit-${stem}${EXTENSION}`;
+	// After the trim, which turns `con-` back into a reserved `con`.
+	const named = RESERVED.test(stem) ? `microbit-${stem}` : stem || 'microbit';
 
-	return `${stem || 'microbit'}${EXTENSION}`;
+	// Again: the prefix can push past the cap, and cannot become reserved itself.
+	const capped = [...named].slice(0, MAX_FILENAME - EXTENSION.length).join('');
+	return `${capped.replace(/[-.]+$/, '')}${EXTENSION}`;
 }

@@ -15,15 +15,11 @@ export interface Prepared extends Built {
 	files: readonly SelectedFile[];
 }
 
-/**
- * Names the project folder, and only when there is one to name: a clause that
- * never varies is noise in every message it appears in.
- */
+/** Omits the common workspace-root case from notifications. */
 export const projectClause = (prepared: Prepared) => (prepared.project ? ` in ${prepared.project}/` : '');
 
 /**
- * Everything Flash and Save Hex do before they diverge: pick the folder, choose
- * the files, build a hex that runs on any micro:bit.
+ * Shared preparation for Flash and Save Hex: resolve, select, and build.
  *
  * `undefined` means the command has nothing left to do, and the user has either
  * been told why or dismissed the folder pick and needs no telling.
@@ -44,21 +40,21 @@ export async function prepareHex(context: vscode.ExtensionContext): Promise<Prep
 		return undefined;
 	}
 
-	// A browser host reads the workspace over the network, so this fails rather
-	// than coming back empty, and unguarded VS Code puts up its own raw modal.
+	// Browser-backed workspace reads can reject instead of returning an empty list.
 	let selection: Selection;
 	try {
 		selection = await selectWorkspaceFiles(project.uri);
 	} catch (error) {
 		log(`Could not read the workspace: ${String(error)}`);
-		void vscode.window.showErrorMessage(`${PRODUCT}: could not read the files in this folder. ${messageOf(error)}`);
+		void vscode.window.showErrorMessage(
+			`${PRODUCT}: could not read the files in this folder, see the output for why.`
+		);
 		return undefined;
 	}
 
 	report(project.uri, selection);
 
-	// Before a megabyte of firmware is read for a build that was never going to
-	// happen. No omissions list: this already says everything was left out.
+	// Refuse before loading firmware when no selected file could use it.
 	if (selection.files.length === 0) {
 		const where = project.path ? `${project.path}/` : 'this folder';
 		void vscode.window.showWarningMessage(
@@ -83,9 +79,6 @@ export async function prepareHex(context: vscode.ExtensionContext): Promise<Prep
 		return undefined;
 	}
 }
-
-/** Whatever an error carries, in the one form a sentence can be built around. */
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /**
  * Both images, because with no board to ask which version it is the hex has to
@@ -118,10 +111,10 @@ function explainProject(problem: Problem, named: string): string {
 	}
 }
 
-/** Our own refusals already read as sentences; anything else needs framing. */
+/** Our own refusals already read as sentences; anything else stays in the log. */
 function explain(error: unknown): string {
 	if (error instanceof StorageFullError || error instanceof FirmwareError) return error.message;
-	return `the hex could not be built. ${messageOf(error)}`;
+	return 'the hex could not be built, see the output for why.';
 }
 
 /** The output channel carries every exclusion; the notification carries few. */
@@ -141,16 +134,11 @@ const REASONS: Record<SkipReason, string> = {
 	empty: 'file is empty',
 };
 
-/**
- * Names the folders rather than what is inside them, so the message stays one
- * line whether a folder holds two files or two hundred. Once per build: a toast
- * per file is what teaches a learner to dismiss them unread.
- */
+/** Reports all notable omissions once without reading inside folders. */
 function warnAboutOmissions(selection: Selection): void {
 	const omitted = [
 		...selection.folders.map((name) => `${name}/`),
-		// `notable` is the core's judgement of what would surprise a user, which a
-		// dotfile is not: `.DS_Store` appears from merely opening the folder.
+		// Routine dotfiles remain in the output channel instead of every notification.
 		...selection.skipped.filter((skip) => skip.notable).map((skip) => skip.name),
 	];
 	if (omitted.length === 0) return;

@@ -139,6 +139,12 @@ async function checkTheHexSurvivesBeingSaved(built: string): Promise<void> {
 	}
 
 	const target = vscode.Uri.joinPath(root, hexFilename('integration'));
+	// The desktop bench is a real folder in this repository.
+	if (await exists(target)) {
+		record(name, false, `${target} is already there, and is not this check's to overwrite`);
+		return;
+	}
+
 	try {
 		await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(built));
 		const read = new TextDecoder().decode(await vscode.workspace.fs.readFile(target));
@@ -146,9 +152,7 @@ async function checkTheHexSurvivesBeingSaved(built: string): Promise<void> {
 	} catch (error) {
 		record(name, false, String(error));
 	} finally {
-		// The desktop bench is a real folder in the repository, and a 1.9 MB build
-		// output does not get to stay in it.
-		await vscode.workspace.fs.delete(target).then(undefined, () => undefined);
+		await remove(target);
 	}
 }
 
@@ -184,6 +188,8 @@ async function checkSelectionFollowsTheProjectFolder(): Promise<void> {
 	const existedBefore = { folder: await exists(dotVscode), file: await exists(settingsFile) };
 
 	const settings = vscode.workspace.getConfiguration(SECTION, folder.uri);
+	// A developer mid-way through checking this feature by hand has one set.
+	const before = settings.inspect(SETTINGS.projectFolder)?.workspaceFolderValue;
 	try {
 		await settings.update(SETTINGS.projectFolder, 'lib', vscode.ConfigurationTarget.WorkspaceFolder);
 		const project = await resolveProject(folder);
@@ -202,10 +208,9 @@ async function checkSelectionFollowsTheProjectFolder(): Promise<void> {
 	} catch (error) {
 		record(name, false, String(error));
 	} finally {
-		// Removing the key is enough to leave any other setting in the file alone,
-		// and it is what stops every later check in this run selecting from lib/.
+		// Back to whatever was there, which is usually nothing.
 		await settings
-			.update(SETTINGS.projectFolder, undefined, vscode.ConfigurationTarget.WorkspaceFolder)
+			.update(SETTINGS.projectFolder, before, vscode.ConfigurationTarget.WorkspaceFolder)
 			.then(undefined, () => undefined);
 
 		// Only what this check made. Neither delete is recursive, so a `.vscode`

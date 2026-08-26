@@ -35,6 +35,13 @@ describe('the name the hex is offered under', () => {
 		expect(hexFilename('com10')).toBe('com10.hex');
 	});
 
+	it('stays inside the cap even once the escape prefix is added', () => {
+		const name = hexFilename(`con.${'a'.repeat(200)}`);
+
+		expect(name.startsWith('microbit-con.')).toBe(true);
+		expect([...name]).toHaveLength(MAX_FILENAME);
+	});
+
 	it('checks for one after the trimming, not before it', () => {
 		// `con ` and `con-` are ordinary folder names on macOS and Linux, and both
 		// come out of the trim as a bare `con`. Checked any earlier, the trim is

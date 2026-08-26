@@ -14,7 +14,7 @@ export async function flash(context: vscode.ExtensionContext): Promise<void> {
 	const names = prepared.files.map((file) => file.name).join(', ');
 	void vscode.window.showInformationMessage(
 		`${PRODUCT}: built a hex from ${prepared.files.length} file(s)${projectClause(prepared)} (${names}), ` +
-			`using ${prepared.used} bytes of the ${prepared.available} a hex that runs on every micro:bit has ` +
+			`using ${prepared.used} of the ${prepared.available} bytes a hex that runs on every micro:bit has ` +
 			'room for. Writing to a board is not implemented yet.'
 	);
 }

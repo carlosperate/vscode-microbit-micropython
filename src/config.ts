@@ -1,11 +1,7 @@
 /**
- * The ids VS Code knows us by. Every one of these also appears in package.json,
- * and the two are compared at runtime by the integration tests: a manifest entry
- * with no handler shows in the palette and throws when clicked, which nothing
- * else in the toolchain can see.
- *
- * All of them are prefixed with the extension's own name. `microbit.*` belongs
- * to the micro:bit Foundation's extension pack.
+ * Command ids are duplicated in package.json because VS Code reads the manifest.
+ * Integration tests catch drift, and the extension prefix avoids collisions with
+ * the micro:bit Foundation's `microbit.*` commands.
  */
 export const COMMANDS = {
 	flash: 'microbit-micropython.flash',
@@ -30,12 +26,7 @@ export const SETTINGS = {
 export const settingId = (key: (typeof SETTINGS)[keyof typeof SETTINGS]) => `${SECTION}.${key}`;
 
 /**
- * The user-facing name, and it always carries MicroPython. This is not a generic
- * micro:bit extension: the board is also programmed in C++ and MakeCode, and the
- * Foundation's own extension pack contributes commands under a bare `micro:bit`
- * category. Anywhere a user reads a name, it has to say which of those this is.
- *
- * Matches `displayName` and the `category` on every contributed command, which
- * is what VS Code renders as the `micro:bit MicroPython: ` palette prefix.
+ * The user-facing name distinguishes this extension from other micro:bit
+ * toolchains and matches the manifest display name and command categories.
  */
-export const PRODUCT = 'micro:bit MicroPython';
+export const PRODUCT = 'BBC micro:bit MicroPython';

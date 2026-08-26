@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
-    "@types/vscode": "^1.91.0",
+    "@types/vscode": "1.91.0",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/test-web": "^0.0.81",
     "esbuild": "^0.28.1",
@@ -57,7 +57,7 @@
   ],
   "contributes": {
     "configuration": {
-      "title": "micro:bit MicroPython",
+      "title": "BBC micro:bit MicroPython",
       "properties": {
         "microbit-micropython.projectFolder": {
           "type": "string",
@@ -80,37 +80,37 @@
       {
         "command": "microbit-micropython.flash",
         "title": "Flash",
-        "category": "micro:bit MicroPython"
+        "category": "BBC micro:bit MicroPython"
       },
       {
         "command": "microbit-micropython.saveHex",
         "title": "Save Hex",
-        "category": "micro:bit MicroPython"
+        "category": "BBC micro:bit MicroPython"
       },
       {
         "command": "microbit-micropython.selectProjectFolder",
         "title": "Select Project Folder",
-        "category": "micro:bit MicroPython"
+        "category": "BBC micro:bit MicroPython"
       },
       {
         "command": "microbit-micropython.connect",
         "title": "Connect",
-        "category": "micro:bit MicroPython"
+        "category": "BBC micro:bit MicroPython"
       },
       {
         "command": "microbit-micropython.disconnect",
         "title": "Disconnect",
-        "category": "micro:bit MicroPython"
+        "category": "BBC micro:bit MicroPython"
       },
       {
         "command": "microbit-micropython.openTerminal",
         "title": "Open Serial Terminal",
-        "category": "micro:bit MicroPython"
+        "category": "BBC micro:bit MicroPython"
       },
       {
         "command": "microbit-micropython.resetBoard",
         "title": "Reset Board",
-        "category": "micro:bit MicroPython"
+        "category": "BBC micro:bit MicroPython"
       }
     ],
     "menus": {

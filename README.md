@@ -23,8 +23,8 @@ https://github.com/carlosperate/vscode-microbit-micropython/issues
 Every file in your micro:bit project folder goes on the board, not only
 `main.py` and not only `.py` files. Dot files are left out, and so are `.hex`
 files, which are what this extension builds rather than something to put on the
-board. The device filesystem is flat, so files in subfolders are left out too
-and the extension tells you which ones.
+board. The device filesystem is flat, so files in subfolders are left out too.
+The extension names the folders it skipped without reading their contents.
 
 The project folder is the whole workspace by default. If your code lives in a
 subfolder, right-click it and choose **Select Project Folder**, or set
