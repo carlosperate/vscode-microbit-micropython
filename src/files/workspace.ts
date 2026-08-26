@@ -15,20 +15,20 @@ import { selectFiles, type DirEntry, type Selection } from './select';
  *
  * Resolves `undefined` only when the user dismissed the pick. Callers check for
  * an open folder first, so there is one meaning for it and no message to write.
+ *
+ * The folder rather than its URI, because callers want its name as well and
+ * looking that back up through `getWorkspaceFolder` is a round trip to recover
+ * something this function already had.
  */
-export async function chooseWorkspaceRoot(): Promise<vscode.Uri | undefined> {
-	// Read fresh on every call rather than caching at activation. A host can swap
-	// the workspace folder in place with `updateWorkspaceFolders`, and there is
-	// then nothing to go stale. It also makes the swap testable in harnesses that
-	// never deliver `onDidChangeWorkspaceFolders`, where a cache invalidated by
-	// that event would silently keep the old root forever.
+export async function chooseWorkspaceFolder(): Promise<vscode.WorkspaceFolder | undefined> {
+	// Read fresh, never cached: a host swaps the folder in place, and a cache
+	// keyed on `onDidChangeWorkspaceFolders` never fires in `vscode-test-web`.
 	const folders = vscode.workspace.workspaceFolders ?? [];
-	if (folders.length === 1) return folders[0].uri;
+	if (folders.length === 1) return folders[0];
 
-	const chosen = await vscode.window.showWorkspaceFolderPick({
+	return vscode.window.showWorkspaceFolderPick({
 		placeHolder: 'Which folder should go on the micro:bit?',
 	});
-	return chosen?.uri;
 }
 
 /**

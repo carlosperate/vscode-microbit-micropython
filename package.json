@@ -1,6 +1,6 @@
 {
   "name": "microbit-micropython",
-  "displayName": "micro:bit MicroPython",
+  "displayName": "BBC micro:bit MicroPython",
   "description": "Build and flash a MicroPython project to a BBC micro:bit over WebUSB, with a serial REPL.",
   "version": "0.1.0",
   "publisher": "carlosperate",

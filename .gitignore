@@ -5,3 +5,5 @@ dist/
 .playwright-mcp/
 *.vsix
 .env
+test/workspace/*.hex
+!test/workspace/project.hex

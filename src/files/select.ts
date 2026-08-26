@@ -14,7 +14,7 @@ export interface DirEntry {
 }
 
 /** Why a root entry did not make it onto the board. */
-export type SkipReason = 'dotfile' | 'excluded' | 'name-too-long' | 'name-has-slash' | 'empty';
+export type SkipReason = 'dotfile' | 'excluded' | 'build-output' | 'name-too-long' | 'name-has-slash' | 'empty';
 
 export interface Skipped {
 	name: string;
@@ -71,6 +71,13 @@ export async function selectFiles(
 
 		if (entry.isDirectory) {
 			folders.push(name);
+			continue;
+		}
+
+		// A saved hex lands beside the code, and taking it back in refuses the next
+		// build over a file nobody wrote. Case folded: FAT hands names back shouting.
+		if (name.toLowerCase().endsWith('.hex')) {
+			skipped.push({ name, reason: 'build-output', notable: false });
 			continue;
 		}
 

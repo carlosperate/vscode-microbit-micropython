@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 import { flash } from './commands/flash';
+import { saveHex } from './commands/saveHex';
 import { COMMANDS, PRODUCT, type CommandId } from './config';
 import { createLog, log } from './log';
 import { createStatusBar } from './ui/statusbar';
@@ -15,6 +16,7 @@ import { createStatusBar } from './ui/statusbar';
  */
 const IMPLEMENTED: Partial<Record<CommandId, (context: vscode.ExtensionContext) => Promise<void>>> = {
 	[COMMANDS.flash]: flash,
+	[COMMANDS.saveHex]: saveHex,
 };
 
 export function activate(context: vscode.ExtensionContext): void {

@@ -38,6 +38,7 @@ const bench = {
 	'main.py': 'from microbit import *',
 	'data.txt': 'hello',
 	'.hidden.py': 'SKIPPED = True',
+	'project.hex': ':00000001FF',
 	lib: null,
 	'lib/helper.py': 'def greet(): pass',
 };
@@ -118,6 +119,39 @@ describe('folders', () => {
 		);
 
 		expect(selection.folders).toEqual(['lib']);
+		expect(readFile.mock.calls.flat()).toEqual(['main.py']);
+	});
+});
+
+describe('a hex in the workspace', () => {
+	it('is left out, because it is what this extension puts there', async () => {
+		// Saving with no download bridge writes the hex beside the code. Taken back
+		// in, it is orders of magnitude past the device filesystem, so the next
+		// build is refused over a file the user never created.
+		const selection = await select(bench);
+
+		expect(names(selection.files)).not.toContain('project.hex');
+		expect(selection.skipped).toContainEqual({ name: 'project.hex', reason: 'build-output', notable: false });
+	});
+
+	it('is left out whatever the case, since a name off a FAT drive shouts', async () => {
+		const selection = await select({ 'main.py': 'x = 1', 'PROJECT.HEX': ':00000001FF' });
+
+		expect(names(selection.files)).toEqual(['main.py']);
+	});
+
+	it('is never opened, so the read it would cost never happens', async () => {
+		const readFile = vi.fn(async () => new TextEncoder().encode('x = 1'));
+
+		await selectFiles(
+			async () => [
+				{ name: 'main.py', isDirectory: false },
+				{ name: 'project.hex', isDirectory: false },
+			],
+			readFile,
+			[]
+		);
+
 		expect(readFile.mock.calls.flat()).toEqual(['main.py']);
 	});
 });

@@ -1,6 +1,8 @@
+import { microbitBoardId } from '@microbit/microbit-fs';
 import * as vscode from 'vscode';
 
-import { chooseWorkspaceRoot, selectWorkspaceFiles } from '../../src/files/workspace';
+import { hexFilename } from '../../src/filename';
+import { chooseWorkspaceFolder, selectWorkspaceFiles } from '../../src/files/workspace';
 import { readFirmware } from '../../src/hex/assets';
 import { buildFs, generateHex } from '../../src/hex/build';
 
@@ -29,7 +31,7 @@ function record(name: string, ok: boolean, detail: string): void {
 
 /**
  * The bench is one folder, so the root is taken directly rather than through
- * `chooseWorkspaceRoot`, which would put a quick pick in front of a headless run
+ * `chooseWorkspaceFolder`, which would put a quick pick in front of a headless run
  * the moment a second root existed.
  */
 const benchRoot = () => vscode.workspace.workspaceFolders?.[0]?.uri;
@@ -46,7 +48,8 @@ export async function run(): Promise<void> {
 	await checkActivation(extension);
 	await checkContributedCommandsResolve(extension);
 	await checkSelectionOnTheRealWorkspace();
-	await checkHexBuildsFromTheRealWorkspace(extension);
+	const built = await checkHexBuildsFromTheRealWorkspace(extension);
+	if (built) await checkTheHexSurvivesBeingSaved(built);
 	await reportWebUsb();
 
 	// Last, and never in the middle. Replacing workspace folder 0 may terminate
@@ -70,7 +73,9 @@ export async function run(): Promise<void> {
  * of Intel hex parsed and reassembled, and it happens inside a Web Worker on
  * both hosts. Unit tests run it in Node, where a great deal more is available.
  */
-async function checkHexBuildsFromTheRealWorkspace(extension: vscode.Extension<unknown>): Promise<void> {
+async function checkHexBuildsFromTheRealWorkspace(
+	extension: vscode.Extension<unknown>
+): Promise<string | undefined> {
 	let images;
 	try {
 		images = await Promise.all([
@@ -79,7 +84,7 @@ async function checkHexBuildsFromTheRealWorkspace(extension: vscode.Extension<un
 		]);
 	} catch (error) {
 		record('the shipped firmware is readable', false, `from ${extension.extensionUri}: ${String(error)}`);
-		return;
+		return undefined;
 	}
 	record(
 		'the shipped firmware is readable',
@@ -90,13 +95,13 @@ async function checkHexBuildsFromTheRealWorkspace(extension: vscode.Extension<un
 	const root = benchRoot();
 	if (!root) {
 		record('a hex builds from the workspace', false, 'no workspace folder to build from');
-		return;
+		return undefined;
 	}
 
 	const selection = await selectWorkspaceFiles(root);
 	if (!selection.files.length) {
 		record('a hex builds from the workspace', false, 'the workspace had no files to build from');
-		return;
+		return undefined;
 	}
 
 	try {
@@ -106,10 +111,52 @@ async function checkHexBuildsFromTheRealWorkspace(extension: vscode.Extension<un
 			hex.startsWith(':'),
 			`${hex.length} characters, using ${used} of ${available} bytes of storage`
 		);
+		return hex;
 	} catch (error) {
 		record('a hex builds from the workspace', false, String(error));
+		return undefined;
 	}
 }
+
+/**
+ * The write Save Hex ends in, against whichever scheme this host gave the
+ * workspace: virtual in the browser, real `file:` URIs on the desktop. Only a
+ * real host has either, and a megabyte of Intel hex is the payload that would
+ * show up a provider mangling what it was given.
+ *
+ * The command itself is not run. It opens a save dialog nobody can answer in a
+ * headless session, and a run that hangs there is worse than one check less.
+ * That its id is registered at all is covered above.
+ */
+async function checkTheHexSurvivesBeingSaved(built: string): Promise<void> {
+	const name = 'the hex is written back out as a real file';
+	const root = benchRoot();
+	if (!root) {
+		record(name, false, 'no workspace folder to write into');
+		return;
+	}
+
+	const target = vscode.Uri.joinPath(root, hexFilename('integration'));
+	try {
+		await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(built));
+		const read = new TextDecoder().decode(await vscode.workspace.fs.readFile(target));
+		record(name, read === built && holdsBothBoards(read), `${target}, ${read.length} characters read back`);
+	} catch (error) {
+		record(name, false, String(error));
+	} finally {
+		// The desktop bench is a real folder in the repository, and a 1.9 MB build
+		// output does not get to stay in it.
+		await vscode.workspace.fs.delete(target).then(undefined, () => undefined);
+	}
+}
+
+/**
+ * A universal hex opens each board's block with that board's id followed by
+ * C0DE. Output carrying one of them is half the size and runs on half a
+ * classroom, which is the failure worth naming rather than counting bytes.
+ */
+const holdsBothBoards = (hex: string) =>
+	[microbitBoardId.V1, microbitBoardId.V2].every((id) => hex.includes(`${id.toString(16)}C0DE`));
 
 /**
  * The selection rules are unit-tested against injected readers; this is the only
@@ -154,16 +201,16 @@ async function checkSelectionFollowsTheRoot(): Promise<void> {
 		return;
 	}
 
-	// Through `chooseWorkspaceRoot`, because it is what reads `workspaceFolders`
+	// Through `chooseWorkspaceFolder`, because it is what reads `workspaceFolders`
 	// now and so it is what could go stale. One folder means it answers without
 	// putting a quick pick in front of a headless run.
-	const root = await chooseWorkspaceRoot();
-	if (!root) {
+	const folder = await chooseWorkspaceFolder();
+	if (!folder) {
 		record('selection follows a swapped root', false, 'no root came back after the swap');
 		return;
 	}
 
-	const selection = await selectWorkspaceFiles(root);
+	const selection = await selectWorkspaceFiles(folder.uri);
 	const names = selection.files.map((file) => file.name);
 	record(
 		'selection follows a swapped root',
