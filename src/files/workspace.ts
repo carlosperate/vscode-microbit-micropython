@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 
 import { SECTION, SETTINGS } from '../config';
 import { log } from '../log';
+import { projectPath, type Refusal } from './project';
 import { selectFiles, type DirEntry, type Selection } from './select';
 
 /**
@@ -29,6 +30,56 @@ export async function chooseWorkspaceFolder(): Promise<vscode.WorkspaceFolder | 
 	return vscode.window.showWorkspaceFolderPick({
 		placeHolder: 'Which folder should go on the micro:bit?',
 	});
+}
+
+/** Where the files come from, and how to name it in a message. */
+export interface Project {
+	uri: vscode.Uri;
+	/** Empty when it is the workspace folder itself, which is the default. */
+	path: string;
+}
+
+/** The configured folder, or why it cannot be used. The caller does the wording. */
+export type ProjectResult = ({ ok: true } & Project) | { ok: false; problem: Problem; named: string };
+
+export type Problem = Refusal | 'missing' | 'not-a-folder' | 'unreadable';
+
+/**
+ * The workspace folder, then whatever `projectFolder` says below it.
+ *
+ * The setting is read against the **workspace folder**, never against the folder
+ * it names: scoping it to that one would need the folder to exist in order to
+ * read the setting that says where it is, which fails exactly when the setting
+ * is wrong and the message matters most.
+ *
+ * Read fresh here for the same reason the folder above it is, so changing the
+ * setting takes effect on the next command with nothing to invalidate.
+ */
+export async function resolveProject(workspace: vscode.WorkspaceFolder): Promise<ProjectResult> {
+	const configured = vscode.workspace.getConfiguration(SECTION, workspace.uri).get<unknown>(SETTINGS.projectFolder);
+	const resolved = projectPath(configured);
+
+	if ('refused' in resolved) {
+		log(`${SETTINGS.projectFolder}: ignored, ${resolved.refused}`);
+		return { ok: false, problem: resolved.refused, named: String(configured) };
+	}
+	if (resolved.segments.length === 0) return { ok: true, uri: workspace.uri, path: '' };
+
+	const uri = vscode.Uri.joinPath(workspace.uri, ...resolved.segments);
+	const path = resolved.segments.join('/');
+	let stat: vscode.FileStat;
+	try {
+		stat = await vscode.workspace.fs.stat(uri);
+	} catch (error) {
+		log(`${SETTINGS.projectFolder}: could not read ${uri}: ${String(error)}`);
+		// Only a not-found says the setting is wrong. A permission error or a
+		// provider that is away sends the user to correct a path that was right.
+		const absent = error instanceof vscode.FileSystemError && error.code === 'FileNotFound';
+		return { ok: false, problem: absent ? 'missing' : 'unreadable', named: path };
+	}
+
+	if ((stat.type & vscode.FileType.Directory) === 0) return { ok: false, problem: 'not-a-folder', named: path };
+	return { ok: true, uri, path };
 }
 
 /**

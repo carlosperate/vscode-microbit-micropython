@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 
-import { PRODUCT } from '../config';
+import { PRODUCT, SETTINGS, settingId } from '../config';
 import { MAX_FILENAME_BYTES, type SelectedFile, type Selection, type SkipReason } from '../files/select';
-import { chooseWorkspaceFolder, selectWorkspaceFiles } from '../files/workspace';
+import { chooseWorkspaceFolder, resolveProject, selectWorkspaceFiles, type Problem } from '../files/workspace';
 import { readFirmware } from '../hex/assets';
 import { buildFs, FirmwareError, generateHex, StorageFullError, type Built } from '../hex/build';
 import { log } from '../log';
@@ -10,8 +10,16 @@ import { log } from '../log';
 /** A hex, what it costs on the device, and where it came from. */
 export interface Prepared extends Built {
 	folder: vscode.WorkspaceFolder;
+	/** The project folder below it, empty when that is the folder itself. */
+	project: string;
 	files: readonly SelectedFile[];
 }
+
+/**
+ * Names the project folder, and only when there is one to name: a clause that
+ * never varies is noise in every message it appears in.
+ */
+export const projectClause = (prepared: Prepared) => (prepared.project ? ` in ${prepared.project}/` : '');
 
 /**
  * Everything Flash and Save Hex do before they diverge: pick the folder, choose
@@ -30,24 +38,31 @@ export async function prepareHex(context: vscode.ExtensionContext): Promise<Prep
 	const folder = await chooseWorkspaceFolder();
 	if (!folder) return undefined;
 
+	const project = await resolveProject(folder);
+	if (!project.ok) {
+		void vscode.window.showErrorMessage(`${PRODUCT}: ${explainProject(project.problem, project.named)}`);
+		return undefined;
+	}
+
 	// A browser host reads the workspace over the network, so this fails rather
 	// than coming back empty, and unguarded VS Code puts up its own raw modal.
 	let selection: Selection;
 	try {
-		selection = await selectWorkspaceFiles(folder.uri);
+		selection = await selectWorkspaceFiles(project.uri);
 	} catch (error) {
 		log(`Could not read the workspace: ${String(error)}`);
 		void vscode.window.showErrorMessage(`${PRODUCT}: could not read the files in this folder. ${messageOf(error)}`);
 		return undefined;
 	}
 
-	report(folder.uri, selection);
+	report(project.uri, selection);
 
 	// Before a megabyte of firmware is read for a build that was never going to
 	// happen. No omissions list: this already says everything was left out.
 	if (selection.files.length === 0) {
+		const where = project.path ? `${project.path}/` : 'this folder';
 		void vscode.window.showWarningMessage(
-			`${PRODUCT}: no files to put on the board. Every file in this folder was left out, see the output for why.`
+			`${PRODUCT}: no files to put on the board. Every file in ${where} was left out, see the output for why.`
 		);
 		return undefined;
 	}
@@ -61,7 +76,7 @@ export async function prepareHex(context: vscode.ExtensionContext): Promise<Prep
 			`Built a hex of ${built.hex.length} bytes in ${Date.now() - started} ms, using ${built.used} of ` +
 				`${built.available} bytes of the room a hex that runs on every micro:bit has`
 		);
-		return { ...built, folder, files: selection.files };
+		return { ...built, folder, project: project.path, files: selection.files };
 	} catch (error) {
 		log(`Could not build the hex: ${String(error)}`);
 		void vscode.window.showErrorMessage(`${PRODUCT}: ${explain(error)}`);
@@ -79,6 +94,28 @@ const messageOf = (error: unknown) => (error instanceof Error ? error.message : 
 async function buildForAnyBoard(extensionUri: vscode.Uri, files: readonly SelectedFile[]): Promise<Built> {
 	const images = await Promise.all([readFirmware(extensionUri, 'V1'), readFirmware(extensionUri, 'V2')]);
 	return generateHex(buildFs(images, files));
+}
+
+/**
+ * Every one of these is a typo in the user's own settings file, so the message
+ * has to be enough to go and fix it without opening the output channel: which
+ * setting, what it currently says, and the two ways to change it.
+ */
+function explainProject(problem: Problem, named: string): string {
+	const fix = `Set ${settingId(SETTINGS.projectFolder)}, or run "${PRODUCT}: Select Project Folder".`;
+	switch (problem) {
+		case 'not-a-string':
+			return `${settingId(SETTINGS.projectFolder)} has to be a folder path. ${fix}`;
+		case 'outside-the-workspace':
+			return `the project folder "${named}" is outside this workspace folder. ${fix}`;
+		case 'missing':
+			return `there is no "${named}" folder in this workspace folder. ${fix}`;
+		case 'not-a-folder':
+			return `the project folder "${named}" is a file, not a folder. ${fix}`;
+		// No `fix`: the setting may be perfectly right and the filesystem away.
+		case 'unreadable':
+			return `the project folder "${named}" could not be read, see the output for why.`;
+	}
 }
 
 /** Our own refusals already read as sentences; anything else needs framing. */

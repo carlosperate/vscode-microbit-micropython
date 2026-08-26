@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { PRODUCT } from '../config';
 import { hexFilename } from '../filename';
 import { log } from '../log';
-import { prepareHex } from './prepare';
+import { prepareHex, projectClause } from './prepare';
 
 /**
  * A hex on disk, which is the whole product in Firefox and Safari and the only
@@ -46,7 +46,9 @@ export async function saveHex(context: vscode.ExtensionContext): Promise<void> {
 	}
 
 	log(`Saved to ${where}`);
-	void vscode.window.showInformationMessage(`${PRODUCT}: saved ${where}. ${nextStep(target)}`);
+	void vscode.window.showInformationMessage(
+		`${PRODUCT}: saved the code${projectClause(prepared)} to ${where}. ${nextStep(target)}`
+	);
 }
 
 /**

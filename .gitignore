@@ -7,3 +7,4 @@ dist/
 .env
 test/workspace/*.hex
 !test/workspace/project.hex
+test/workspace/.vscode/

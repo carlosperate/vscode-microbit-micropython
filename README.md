@@ -20,11 +20,15 @@ https://github.com/carlosperate/vscode-microbit-micropython/issues
 - **Flash:** Send the built MicroPython hex to a connected micro:bit over WebUSB.
 - **Serial & REPL:** A serial terminal to the board, inside VS Code's own terminal.
 
-Every file at the root of your workspace goes on the board, not only `main.py`
-and not only `.py` files. Dot files are left out, and so are `.hex` files, which
-are what this extension builds rather than something to put on the board.
-The device filesystem is flat, so files in subfolders are left out too and the
-extension tells you which ones.
+Every file in your micro:bit project folder goes on the board, not only
+`main.py` and not only `.py` files. Dot files are left out, and so are `.hex`
+files, which are what this extension builds rather than something to put on the
+board. The device filesystem is flat, so files in subfolders are left out too
+and the extension tells you which ones.
+
+The project folder is the whole workspace by default. If your code lives in a
+subfolder, right-click it and choose **Select Project Folder**, or set
+`microbit-micropython.projectFolder`.
 
 ## Requirements
 

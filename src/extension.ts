@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 
 import { flash } from './commands/flash';
 import { saveHex } from './commands/saveHex';
+import { selectProjectFolder } from './commands/selectProjectFolder';
 import { COMMANDS, PRODUCT, type CommandId } from './config';
 import { createLog, log } from './log';
 import { createStatusBar } from './ui/statusbar';
@@ -14,9 +15,12 @@ import { createStatusBar } from './ui/statusbar';
  * answer "not implemented yet" forever, and nothing else would notice: the
  * integration check only asserts that every contributed id is registered.
  */
-const IMPLEMENTED: Partial<Record<CommandId, (context: vscode.ExtensionContext) => Promise<void>>> = {
+const IMPLEMENTED: Partial<
+	Record<CommandId, (context: vscode.ExtensionContext, ...args: unknown[]) => Promise<void>>
+> = {
 	[COMMANDS.flash]: flash,
 	[COMMANDS.saveHex]: saveHex,
+	[COMMANDS.selectProjectFolder]: selectProjectFolder,
 };
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -33,9 +37,11 @@ export function activate(context: vscode.ExtensionContext): void {
 	for (const id of Object.values(COMMANDS)) {
 		const implementation = IMPLEMENTED[id];
 		context.subscriptions.push(
-			vscode.commands.registerCommand(id, async () => {
+			// Forwarded, not dropped: a command on a context menu is handed the
+			// resource that was clicked, and for one of these that is the answer.
+			vscode.commands.registerCommand(id, async (...args: unknown[]) => {
 				log(`Running ${id}`);
-				if (implementation) return implementation(context);
+				if (implementation) return implementation(context, ...args);
 				void vscode.window.showInformationMessage(`${PRODUCT}: ${titles.get(id) ?? id} is not implemented yet.`);
 			})
 		);

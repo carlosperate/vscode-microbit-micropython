@@ -59,13 +59,20 @@
     "configuration": {
       "title": "micro:bit MicroPython",
       "properties": {
+        "microbit-micropython.projectFolder": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "markdownDescription": "The folder holding the micro:bit code, relative to this workspace folder, for example `src`. Empty means the workspace folder itself. Only the files directly inside it go on the micro:bit."
+        },
         "microbit-micropython.files.exclude": {
           "type": "array",
           "items": {
             "type": "string"
           },
           "default": [],
-          "markdownDescription": "Glob patterns for files in the workspace root to keep off the micro:bit, for example `notes.txt` or `*.md`. Files in subfolders are never included: the micro:bit filesystem has no directories."
+          "scope": "resource",
+          "markdownDescription": "Glob patterns for files in the micro:bit project folder to keep off the board, for example `notes.txt` or `*.md`. Files in subfolders are never included: the micro:bit filesystem has no directories."
         }
       }
     },
@@ -78,6 +85,11 @@
       {
         "command": "microbit-micropython.saveHex",
         "title": "Save Hex",
+        "category": "micro:bit MicroPython"
+      },
+      {
+        "command": "microbit-micropython.selectProjectFolder",
+        "title": "Select Project Folder",
         "category": "micro:bit MicroPython"
       },
       {
@@ -100,6 +112,15 @@
         "title": "Reset Board",
         "category": "micro:bit MicroPython"
       }
-    ]
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "microbit-micropython.selectProjectFolder",
+          "when": "explorerResourceIsFolder",
+          "group": "7_modification"
+        }
+      ]
+    }
   }
 }

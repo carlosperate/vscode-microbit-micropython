@@ -10,6 +10,7 @@
 export const COMMANDS = {
 	flash: 'microbit-micropython.flash',
 	saveHex: 'microbit-micropython.saveHex',
+	selectProjectFolder: 'microbit-micropython.selectProjectFolder',
 	connect: 'microbit-micropython.connect',
 	disconnect: 'microbit-micropython.disconnect',
 	openTerminal: 'microbit-micropython.openTerminal',
@@ -22,7 +23,11 @@ export type CommandId = (typeof COMMANDS)[keyof typeof COMMANDS];
 export const SECTION = 'microbit-micropython';
 export const SETTINGS = {
 	filesExclude: 'files.exclude',
+	projectFolder: 'projectFolder',
 } as const;
+
+/** A setting as a user reads it in their own JSON, which is where they fix it. */
+export const settingId = (key: (typeof SETTINGS)[keyof typeof SETTINGS]) => `${SECTION}.${key}`;
 
 /**
  * The user-facing name, and it always carries MicroPython. This is not a generic

@@ -1,8 +1,9 @@
 import { microbitBoardId } from '@microbit/microbit-fs';
 import * as vscode from 'vscode';
 
+import { COMMANDS, SECTION, SETTINGS } from '../../src/config';
 import { hexFilename } from '../../src/filename';
-import { chooseWorkspaceFolder, selectWorkspaceFiles } from '../../src/files/workspace';
+import { chooseWorkspaceFolder, resolveProject, selectWorkspaceFiles } from '../../src/files/workspace';
 import { readFirmware } from '../../src/hex/assets';
 import { buildFs, generateHex } from '../../src/hex/build';
 
@@ -50,6 +51,7 @@ export async function run(): Promise<void> {
 	await checkSelectionOnTheRealWorkspace();
 	const built = await checkHexBuildsFromTheRealWorkspace(extension);
 	if (built) await checkTheHexSurvivesBeingSaved(built);
+	await checkSelectionFollowsTheProjectFolder();
 	await reportWebUsb();
 
 	// Last, and never in the middle. Replacing workspace folder 0 may terminate
@@ -157,6 +159,99 @@ async function checkTheHexSurvivesBeingSaved(built: string): Promise<void> {
  */
 const holdsBothBoards = (hex: string) =>
 	[microbitBoardId.V1, microbitBoardId.V2].every((id) => hex.includes(`${id.toString(16)}C0DE`));
+
+/**
+ * The project folder setting, against a real configuration service.
+ *
+ * The path rules are unit-tested; what only a host can show is that the setting
+ * is read back at the scope it was written to, that the folder it names is
+ * stat-ed on this host's scheme, and that a folder which is not there is a
+ * refusal rather than an exception out of `prepareHex`. The bench already has
+ * the shape: `lib/` holds one file the root does not.
+ */
+async function checkSelectionFollowsTheProjectFolder(): Promise<void> {
+	const name = 'selection follows the project folder';
+	const folder = vscode.workspace.workspaceFolders?.[0];
+	if (!folder) {
+		record(name, false, 'no workspace folder to configure');
+		return;
+	}
+
+	// The bench's `.vscode/` is gitignored, so a developer's own launch
+	// configuration can be sitting in it and is not this check's to delete.
+	const dotVscode = vscode.Uri.joinPath(folder.uri, '.vscode');
+	const settingsFile = vscode.Uri.joinPath(dotVscode, 'settings.json');
+	const existedBefore = { folder: await exists(dotVscode), file: await exists(settingsFile) };
+
+	const settings = vscode.workspace.getConfiguration(SECTION, folder.uri);
+	try {
+		await settings.update(SETTINGS.projectFolder, 'lib', vscode.ConfigurationTarget.WorkspaceFolder);
+		const project = await resolveProject(folder);
+		const names = project.ok ? (await selectWorkspaceFiles(project.uri)).files.map((file) => file.name) : [];
+		record(name, project.ok && names.join(',') === 'helper.py', `lib/ selected [${names.join(', ')}]`);
+
+		await settings.update(SETTINGS.projectFolder, 'nowhere', vscode.ConfigurationTarget.WorkspaceFolder);
+		const missing = await resolveProject(folder);
+		record(
+			'a project folder that is not there is refused',
+			!missing.ok && missing.problem === 'missing',
+			missing.ok ? 'it resolved anyway' : `problem=${missing.problem}, named=${missing.named}`
+		);
+
+		await checkTheCommandTakesAClickedFolder(folder, settings);
+	} catch (error) {
+		record(name, false, String(error));
+	} finally {
+		// Removing the key is enough to leave any other setting in the file alone,
+		// and it is what stops every later check in this run selecting from lib/.
+		await settings
+			.update(SETTINGS.projectFolder, undefined, vscode.ConfigurationTarget.WorkspaceFolder)
+			.then(undefined, () => undefined);
+
+		// Only what this check made. Neither delete is recursive, so a `.vscode`
+		// that still holds something of somebody else's survives.
+		if (!existedBefore.file) await remove(settingsFile);
+		if (!existedBefore.folder) await remove(dotVscode);
+	}
+}
+
+const exists = (uri: vscode.Uri) =>
+	vscode.workspace.fs.stat(uri).then(
+		() => true,
+		() => false
+	);
+
+const remove = (uri: vscode.Uri) => vscode.workspace.fs.delete(uri).then(undefined, () => undefined);
+
+/**
+ * The Explorer context menu hands the command the folder that was clicked
+ * instead of opening a dialog, and that argument has to survive the registration
+ * in `activate`, which forwards what it is given rather than dropping it.
+ *
+ * Invoked here the way the menu invokes it. What this cannot see is whether VS
+ * Code renders the menu item at all: that is the `when` clause, and no API call
+ * anywhere notices a typo in one.
+ */
+async function checkTheCommandTakesAClickedFolder(
+	folder: vscode.WorkspaceFolder,
+	settings: vscode.WorkspaceConfiguration
+): Promise<void> {
+	const name = 'the command takes a folder it was handed';
+	await vscode.commands.executeCommand(COMMANDS.selectProjectFolder, vscode.Uri.joinPath(folder.uri, 'lib'));
+	const set = vscode.workspace.getConfiguration(SECTION, folder.uri).get(SETTINGS.projectFolder);
+	record(name, set === 'lib', `after clicking lib/, the setting reads ${JSON.stringify(set)}`);
+
+	// A dialog will go anywhere on the machine, so the same command has to refuse
+	// what is not inside the workspace rather than store it.
+	await vscode.commands.executeCommand(COMMANDS.selectProjectFolder, vscode.Uri.file('/elsewhere'));
+	const unchanged = vscode.workspace.getConfiguration(SECTION, folder.uri).get(SETTINGS.projectFolder);
+	record(
+		'a folder outside the workspace is refused',
+		unchanged === 'lib',
+		`the setting still reads ${JSON.stringify(unchanged)}`
+	);
+	await settings.update(SETTINGS.projectFolder, undefined, vscode.ConfigurationTarget.WorkspaceFolder);
+}
 
 /**
  * The selection rules are unit-tested against injected readers; this is the only
