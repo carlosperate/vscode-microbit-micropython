@@ -8,7 +8,7 @@
 	// tsserver uses the nearest tsconfig above the file it is checking.
 	"extends": "../tsconfig.json",
 	"compilerOptions": {
-		"types": ["vscode", "node"]
+		"types": ["vscode", "node", "w3c-web-usb"]
 	},
 	"include": ["**/*.ts"]
 }

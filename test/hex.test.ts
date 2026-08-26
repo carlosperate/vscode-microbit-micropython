@@ -181,7 +181,10 @@ describe('the size of the device filesystem', () => {
 	 * A number that is legitimately this big goes in here with the reason it is
 	 * not a capacity, which keeps every one of them a deliberate decision.
 	 */
-	const ALLOWED = new Map<number, string>();
+	const ALLOWED = new Map<number, string>([
+		[0x0d28, "the micro:bit's USB vendor id, which is the library's own device filter and not a size"],
+		[1500, 'milliseconds spent waiting for the USB bus to settle after a board disappears'],
+	]);
 
 	/** Device figures start at one filesystem chunk and run to whole flash pages. */
 	const CHUNK_SIZE = 128;

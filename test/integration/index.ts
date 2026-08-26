@@ -6,6 +6,7 @@ import { hexFilename } from '../../src/filename';
 import { chooseWorkspaceFolder, resolveProject, selectWorkspaceFiles } from '../../src/files/workspace';
 import { readFirmware } from '../../src/hex/assets';
 import { buildFs, generateHex } from '../../src/hex/build';
+import { connectToBoard } from '../../src/usb/connect';
 
 /**
  * The integration tests: the same bundle run on two hosts, `@vscode/test-web` in
@@ -53,6 +54,7 @@ export async function run(): Promise<void> {
 	if (built) await checkTheHexSurvivesBeingSaved(built);
 	await checkSelectionFollowsTheProjectFolder();
 	await reportWebUsb();
+	await checkTheChooserIsNeverReached(await reportTheUsbBridge());
 
 	// Last, and never in the middle. Replacing workspace folder 0 may terminate
 	// and restart every running extension, this script included, so anything after
@@ -401,6 +403,70 @@ async function reportWebUsb(): Promise<void> {
 		record('WebUSB in the extension host', true, `navigator.usb present, ${devices.length} already authorised`);
 	} catch (error) {
 		record('WebUSB in the extension host', true, `navigator.usb present, getDevices() threw: ${String(error)}`);
+	}
+}
+
+const REQUEST_USB_DEVICE = 'workbench.experimental.requestUsbDevice';
+
+/**
+ * Pairing goes through a command the workbench registers on the main thread,
+ * because `requestDevice` is `Window`-only and the extension host is a worker.
+ * Only the web workbench registers it: the desktop bundle carries the class
+ * that would and never instantiates it. Reported rather than asserted, because
+ * it is the host's property and the answer differs on purpose.
+ */
+async function reportTheUsbBridge(): Promise<boolean> {
+	const registered = await vscode.commands.getCommands(true);
+	const present = registered.includes(REQUEST_USB_DEVICE);
+	record(
+		'the workbench bridges requestDevice',
+		true,
+		present ? `${REQUEST_USB_DEVICE} is registered` : `${REQUEST_USB_DEVICE} is absent, so nothing can be paired here`
+	);
+	return present;
+}
+
+/**
+ * The library falls through to a device chooser that does not exist in this
+ * host, and the guard against it is a decision taken before the library is
+ * asked. Run against the real `navigator.usb` and the real command list, since
+ * what is being checked is what a host answers with nothing plugged in.
+ *
+ * Nothing here touches the extension's own connection: module state belongs to
+ * the bundle it was loaded in, and this script is a second bundle, so its copy
+ * of `src/usb/connection.ts` has none of the extension's.
+ */
+async function checkTheChooserIsNeverReached(bridged: boolean): Promise<void> {
+	const name = 'no board means no connection attempt';
+	let connected = false;
+	let asked = false;
+
+	try {
+		const outcome = await connectToBoard({
+			authorised: async () => (navigator.usb ? await navigator.usb.getDevices() : []),
+			canPair: () => bridged,
+			// Stubbed, and only here: the real bridge opens a chooser nothing in a
+			// headless run can answer.
+			pair: async () => {
+				asked = true;
+				return undefined;
+			},
+			connect: async () => {
+				connected = true;
+			},
+			attached: () => undefined,
+			log: () => undefined,
+		});
+
+		// A developer running this with a board already authorised in the profile
+		// takes the other branch, and that is a pass as well: what must not happen
+		// is connecting with nothing for the library to find.
+		const expected = connected
+			? outcome.done === 'connected' && !asked
+			: outcome.done === 'unpairable' && asked === bridged;
+		record(name, expected, `outcome=${outcome.done}, pairing asked=${asked}, connect called=${connected}`);
+	} catch (error) {
+		record(name, false, String(error));
 	}
 }
 

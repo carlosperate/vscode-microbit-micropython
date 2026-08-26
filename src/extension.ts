@@ -1,11 +1,13 @@
 import * as vscode from 'vscode';
 
+import { connect, disconnect } from './commands/board';
 import { flash } from './commands/flash';
 import { saveHex } from './commands/saveHex';
 import { selectProjectFolder } from './commands/selectProjectFolder';
+import { showMenu } from './commands/showMenu';
 import { COMMANDS, PRODUCT, type CommandId } from './config';
 import { createLog, log } from './log';
-import { createStatusBar } from './ui/statusbar';
+import { createBoard, shutdownBoard } from './usb/connection';
 
 /** Implemented commands, keyed by the typed ids also registered below. */
 const IMPLEMENTED: Partial<
@@ -14,13 +16,16 @@ const IMPLEMENTED: Partial<
 	[COMMANDS.flash]: flash,
 	[COMMANDS.saveHex]: saveHex,
 	[COMMANDS.selectProjectFolder]: selectProjectFolder,
+	[COMMANDS.connect]: connect,
+	[COMMANDS.disconnect]: disconnect,
+	[COMMANDS.showMenu]: showMenu,
 };
 
 export function activate(context: vscode.ExtensionContext): void {
 	createLog(context);
 	log('Extension activated');
 
-	context.subscriptions.push(createStatusBar());
+	createBoard(context);
 
 	// Manifest titles keep stub notifications in sync with the command palette.
 	const titles = contributedTitles(context);
@@ -45,7 +50,14 @@ export function activate(context: vscode.ExtensionContext): void {
 	}
 }
 
-export function deactivate(): void {}
+/**
+ * Awaited by VS Code, which is why the board is handed back here rather than
+ * from a subscription: `dispose()` is synchronous and cannot see an asynchronous
+ * disconnect through before the worker goes away.
+ */
+export function deactivate(): Promise<void> {
+	return shutdownBoard();
+}
 
 function contributedTitles(context: vscode.ExtensionContext): Map<string, string> {
 	const contributed: { command: string; title: string }[] =

@@ -18,11 +18,13 @@
     "desktop": "npm run build && node config/desktop.mjs"
   },
   "dependencies": {
+    "@microbit/microbit-connection": "1.0.0",
     "@microbit/microbit-fs": "0.10.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
     "@types/vscode": "1.91.0",
+    "@types/w3c-web-usb": "1.0.14",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/test-web": "^0.0.81",
     "esbuild": "^0.28.1",
@@ -105,11 +107,6 @@
       {
         "command": "microbit-micropython.openTerminal",
         "title": "Open Serial Terminal",
-        "category": "BBC micro:bit MicroPython"
-      },
-      {
-        "command": "microbit-micropython.resetBoard",
-        "title": "Reset Board",
         "category": "BBC micro:bit MicroPython"
       }
     ],

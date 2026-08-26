@@ -3,13 +3,8 @@ import * as vscode from 'vscode';
 import { PRODUCT } from './config';
 
 /**
- * The one output channel, and the instrument to reach for when something goes
- * wrong. Extensions run in a Web Worker whose `console` output does not reliably
- * reach the page console, so anything worth reading later goes here instead.
- *
- * Owned by `context.subscriptions` rather than by `deactivate`, which VS Code
- * does not call for an extension whose activation threw. A channel tied only to
- * `deactivate` outlives such a failure and sits orphaned in the Output dropdown.
+ * The Web Worker console is unreliable, so diagnostics use one output channel.
+ * Context ownership also disposes it when activation fails before `deactivate`.
  */
 let channel: vscode.OutputChannel | undefined;
 
