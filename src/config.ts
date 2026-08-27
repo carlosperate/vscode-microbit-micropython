@@ -19,14 +19,6 @@ export const COMMANDS = {
 
 export type CommandId = (typeof COMMANDS)[keyof typeof COMMANDS];
 
-/** What cannot work without WebUSB, and so is kept out of the status bar menu. */
-export const NEEDS_USB: readonly string[] = [
-	COMMANDS.flash,
-	COMMANDS.connect,
-	COMMANDS.disconnect,
-	COMMANDS.openTerminal,
-];
-
 /** The settings section, and the keys inside it, as the manifest declares them. */
 export const SECTION = 'microbit-micropython';
 export const SETTINGS = {

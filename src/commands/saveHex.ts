@@ -6,8 +6,8 @@ import { log } from '../log';
 import { prepareHex, projectClause } from './prepare';
 
 /**
- * A hex on disk, which is the whole product in Firefox and Safari and the only
- * way to program a board until flashing lands. No board, no USB, nothing to ask
+ * A hex on disk, which is the whole product wherever a board cannot be paired:
+ * Firefox, Safari, and desktop VS Code. No board, no USB, nothing to ask
  * permission for.
  *
  * `showSaveDialog` is the one mechanism, on every host: a native panel on the
@@ -25,8 +25,7 @@ export async function saveHex(context: vscode.ExtensionContext): Promise<void> {
 		filters: { 'micro:bit hex': ['hex'] },
 	});
 
-	// A dismissed dialog is a decision, so it passes without a word. The log still
-	// says so, or nothing tells it apart from a save that broke.
+	// Silent to the user, logged so it can be told from a save that broke.
 	if (!target) {
 		log('The save was dismissed, and nothing was written');
 		return;
@@ -38,8 +37,7 @@ export async function saveHex(context: vscode.ExtensionContext): Promise<void> {
 	try {
 		await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(prepared.hex));
 	} catch (error) {
-		// The host's own reason stays in the log. A `FileSystemError` repeats its
-		// name and the path inside `message`, which buries the part worth reading.
+		// A `FileSystemError` repeats its name and path, burying the readable part.
 		log(`Could not write ${target}: ${String(error)}`);
 		void vscode.window.showErrorMessage(`${PRODUCT}: the hex could not be written to ${where}. Try somewhere else.`);
 		return;

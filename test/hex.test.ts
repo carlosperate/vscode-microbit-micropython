@@ -13,7 +13,16 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 
 import { type SelectedFile } from '../src/files/select';
-import { buildFs, createFirmwareCache, FirmwareError, generateHex, StorageFullError } from '../src/hex/build';
+import {
+	buildFor,
+	buildFs,
+	createFirmwareCache,
+	FirmwareError,
+	generateHex,
+	StorageFullError,
+	type BoardVersion,
+	type Firmware,
+} from '../src/hex/build';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const sourceDir = path.join(here, '..', 'src');
@@ -70,6 +79,56 @@ describe('choosing a hex for a target', () => {
 		// not found." with nothing in it a user could act on.
 		expect(() => generateHex(fs, microbitBoardId.V1)).toThrow(FirmwareError);
 		expect(() => generateHex(fs, microbitBoardId.V1)).toThrow(/micro:bit/);
+	});
+});
+
+/**
+ * A flash knows which board answered, so it builds from that board's image
+ * alone. Reading the other one costs half a megabyte of parsing for a hex that
+ * would then be twice the size it needs to be.
+ */
+describe('building for the board that is there', () => {
+	const reads = () => vi.fn<(version: BoardVersion) => Promise<Firmware>>(firmware);
+
+	it('reads one image for a known board, and only that one', async () => {
+		const read = reads();
+		const built = await buildFor(read, 'V2', [PROGRAM]);
+
+		expect(read.mock.calls.flat()).toEqual(['V2']);
+		expect(built.hex.startsWith(':')).toBe(true);
+	});
+
+	it('reads every image when the board is unknown', async () => {
+		const read = reads();
+		await buildFor(read, undefined, [PROGRAM]);
+
+		expect(read.mock.calls.flat().sort()).toEqual(['V1', 'V2']);
+	});
+
+	/** The hex a board gets has to be the one its own id opens, or it runs nothing. */
+	it('gives each board a hex its own id opens', async () => {
+		const forV1 = await buildFor(firmware, 'V1', [PROGRAM]);
+		const forV2 = await buildFor(firmware, 'V2', [PROGRAM]);
+		const forEither = await buildFor(firmware, undefined, [PROGRAM]);
+
+		expect(forV1.hex).not.toBe(forV2.hex);
+		// A universal hex opens each board's block with that id followed by C0DE.
+		// Asserted present there first, or the absences below would pass on a
+		// sentinel that had changed shape and stopped meaning anything.
+		for (const id of [microbitBoardId.V1, microbitBoardId.V2]) {
+			const marker = `${id.toString(16)}C0DE`;
+			expect(forEither.hex).toContain(marker);
+			expect(forV1.hex).not.toContain(marker);
+			expect(forV2.hex).not.toContain(marker);
+		}
+	});
+
+	/** Half the room of a universal build, and it is the library's figure either way. */
+	it('reports the room on that board rather than on the smallest', async () => {
+		const forV2 = await buildFor(firmware, 'V2', [PROGRAM]);
+		const forEither = await buildFor(firmware, undefined, [PROGRAM]);
+
+		expect(forV2.available).toBeGreaterThanOrEqual(forEither.available);
 	});
 });
 

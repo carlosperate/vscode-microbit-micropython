@@ -61,6 +61,9 @@ const IMAGES: Record<BoardVersion, { file: string; boardId: microbitBoardId }> =
 	V2: { file: manifest.v2.file, boardId: microbitBoardId.V2 },
 };
 
+/** Every board there is an image for, derived so adding one reaches every build. */
+const BOARDS = Object.keys(IMAGES) as BoardVersion[];
+
 /** The images ship in the VSIX, so anything wrong with one is an install away. */
 const REINSTALL = 'Reinstalling the extension should restore it.';
 
@@ -162,6 +165,27 @@ export function generateHex(fs: MicropythonFsHex, boardId?: microbitBoardId): Bu
 		}
 		throw error;
 	}
+}
+
+/**
+ * A hex for one board when its version is known, and one that runs on every
+ * board there is an image for when it is not. Only what the target needs is
+ * read, so a flash to a V2 never touches the V1 image or its half a megabyte.
+ */
+export async function buildFor(
+	read: (version: BoardVersion) => PromiseLike<Firmware>,
+	board: BoardVersion | undefined,
+	files: readonly SelectedFile[]
+): Promise<Built> {
+	if (board) {
+		const image = await read(board);
+		return generateHex(buildFs([image], files), image.boardId);
+	}
+
+	// Called with the version alone: passing `read` to `map` would hand it the
+	// index and the array as well, which a reader is free to have parameters for.
+	const images = await Promise.all(BOARDS.map((version) => read(version)));
+	return generateHex(buildFs(images, files));
 }
 
 /** The sentence says which of the two builds the figures are about. */

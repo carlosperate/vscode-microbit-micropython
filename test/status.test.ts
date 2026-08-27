@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { COMMANDS, PRODUCT } from '../src/config';
 import { describeError, explainDevice } from '../src/ui/errors';
-import { menuCommands, menuOrder, type Reachable } from '../src/ui/menu';
+import { menuCommands, menuOrder } from '../src/ui/menu';
 import { describeStatus } from '../src/ui/status';
 
 describe('what the status bar says', () => {
@@ -122,11 +122,6 @@ describe('what a failure reads as', () => {
 	});
 });
 
-/**
- * A `when` clause hides a command from the palette for free. This menu is built
- * by hand, so it has to hide the same ones itself, and a browser with no WebUSB
- * is the only place the difference shows.
- */
 describe('the status bar menu', () => {
 	// The manifest's own order, which is not the menu's.
 	const contributed = [
@@ -138,32 +133,16 @@ describe('the status bar menu', () => {
 		{ command: COMMANDS.openTerminal, title: 'Open Serial Terminal' },
 	];
 
-	const titles = (reachable: Reachable) => menuCommands(contributed, reachable).map((entry) => entry.title);
+	const titles = (connected: boolean) => menuCommands(contributed, connected).map((entry) => entry.title);
 
 	/** Nothing below it works until it has been done, so it leads. */
 	it('puts Connect first while there is no board', () => {
-		expect(titles({ usb: true, connected: false })).toEqual([
-			'Connect',
-			'Flash',
-			'Open Serial Terminal',
-			'Save Hex',
-			'Select Project Folder',
-		]);
+		expect(titles(false)).toEqual(['Connect', 'Flash', 'Open Serial Terminal', 'Save Hex', 'Select Project Folder']);
 	});
 
 	/** It undoes the menu rather than using it, so it trails. */
 	it('puts Disconnect last once there is one', () => {
-		expect(titles({ usb: true, connected: true })).toEqual([
-			'Flash',
-			'Open Serial Terminal',
-			'Save Hex',
-			'Select Project Folder',
-			'Disconnect',
-		]);
-	});
-
-	it('offers only what works where there is no WebUSB', () => {
-		expect(titles({ usb: false, connected: false })).toEqual(['Save Hex', 'Select Project Folder']);
+		expect(titles(true)).toEqual(['Flash', 'Open Serial Terminal', 'Save Hex', 'Select Project Folder', 'Disconnect']);
 	});
 
 	/**
@@ -178,7 +157,7 @@ describe('the status bar menu', () => {
 
 		const withStranger = [...contributed, { command: 'microbit-micropython.invented', title: 'Invented' }];
 		for (const connected of [true, false]) {
-			const shown = menuCommands(withStranger, { usb: true, connected });
+			const shown = menuCommands(withStranger, connected);
 			expect(shown[shown.length - 1]?.title, `connected=${connected}`).toBe('Invented');
 		}
 	});

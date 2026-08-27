@@ -4,7 +4,7 @@ import { PRODUCT, SETTINGS, settingId } from '../config';
 import { MAX_FILENAME_BYTES, type SelectedFile, type Selection, type SkipReason } from '../files/select';
 import { chooseWorkspaceFolder, resolveProject, selectWorkspaceFiles, type Problem } from '../files/workspace';
 import { readFirmware } from '../hex/assets';
-import { buildFs, FirmwareError, generateHex, StorageFullError, type Built } from '../hex/build';
+import { buildFor, FirmwareError, StorageFullError, type BoardVersion, type Built } from '../hex/build';
 import { log } from '../log';
 
 /** A hex, what it costs on the device, and where it came from. */
@@ -15,20 +15,34 @@ export interface Prepared extends Built {
 	files: readonly SelectedFile[];
 }
 
+/**
+ * Whether there is a workspace at all. Exported so Flash can ask before it
+ * connects: reaching this check afterwards means opening a device chooser and
+ * pairing a board, only to say there was nothing to send it.
+ */
+export function hasSomethingToBuild(): boolean {
+	if (vscode.workspace.workspaceFolders?.length) return true;
+
+	void vscode.window.showWarningMessage(`${PRODUCT}: open a folder first, there is nothing to build.`);
+	return false;
+}
+
 /** Omits the common workspace-root case from notifications. */
 export const projectClause = (prepared: Prepared) => (prepared.project ? ` in ${prepared.project}/` : '');
 
 /**
  * Shared preparation for Flash and Save Hex: resolve, select, and build.
  *
- * `undefined` means the command has nothing left to do, and the user has either
- * been told why or dismissed the folder pick and needs no telling.
+ * `board` is the version to build for when it is known, which is what makes the
+ * storage figures that board's own. `undefined` means the command has nothing
+ * left to do, and the user has either been told why or dismissed the folder pick
+ * and needs no telling.
  */
-export async function prepareHex(context: vscode.ExtensionContext): Promise<Prepared | undefined> {
-	if (!vscode.workspace.workspaceFolders?.length) {
-		void vscode.window.showWarningMessage(`${PRODUCT}: open a folder first, there is nothing to build.`);
-		return undefined;
-	}
+export async function prepareHex(
+	context: vscode.ExtensionContext,
+	board?: BoardVersion
+): Promise<Prepared | undefined> {
+	if (!hasSomethingToBuild()) return undefined;
 
 	// Dismissing the pick is an answer, so it passes without a word.
 	const folder = await chooseWorkspaceFolder();
@@ -63,14 +77,14 @@ export async function prepareHex(context: vscode.ExtensionContext): Promise<Prep
 		return undefined;
 	}
 
-	warnAboutOmissions(selection);
+	warnAboutOmissions(context, project.uri, selection);
 
 	try {
 		const started = Date.now();
-		const built = await buildForAnyBoard(context.extensionUri, selection.files);
+		const built = await buildFor((version) => readFirmware(context.extensionUri, version), board, selection.files);
 		log(
-			`Built a hex of ${built.hex.length} bytes in ${Date.now() - started} ms, using ${built.used} of ` +
-				`${built.available} bytes of the room a hex that runs on every micro:bit has`
+			`Built a ${board ?? 'universal'} hex of ${built.hex.length} bytes in ${Date.now() - started} ms, ` +
+				`using ${built.used} of ${built.available} bytes of storage`
 		);
 		return { ...built, folder, project: project.path, files: selection.files };
 	} catch (error) {
@@ -78,15 +92,6 @@ export async function prepareHex(context: vscode.ExtensionContext): Promise<Prep
 		void vscode.window.showErrorMessage(`${PRODUCT}: ${explain(error)}`);
 		return undefined;
 	}
-}
-
-/**
- * Both images, because with no board to ask which version it is the hex has to
- * run on either, and the room reported is the room on whichever holds less.
- */
-async function buildForAnyBoard(extensionUri: vscode.Uri, files: readonly SelectedFile[]): Promise<Built> {
-	const images = await Promise.all([readFirmware(extensionUri, 'V1'), readFirmware(extensionUri, 'V2')]);
-	return generateHex(buildFs(images, files));
 }
 
 /**
@@ -134,13 +139,28 @@ const REASONS: Record<SkipReason, string> = {
 	empty: 'file is empty',
 };
 
-/** Reports all notable omissions once without reading inside folders. */
-function warnAboutOmissions(selection: Selection): void {
+/** Keyed per project: two projects can both have a `lib/` and must warn independently. */
+const LAST_OMISSIONS_SHOWN = 'lastOmissionsShown';
+
+/**
+ * Reports notable omissions once per distinct set, not once per flash. A `lib/`
+ * folder a user already knows about does not need re-announcing on every edit;
+ * a newly-appearing omission, or one that disappears, does.
+ */
+function warnAboutOmissions(context: vscode.ExtensionContext, project: vscode.Uri, selection: Selection): void {
 	const omitted = [
 		...selection.folders.map((name) => `${name}/`),
 		// Routine dotfiles remain in the output channel instead of every notification.
 		...selection.skipped.filter((skip) => skip.notable).map((skip) => skip.name),
 	];
+
+	const key = `${LAST_OMISSIONS_SHOWN}:${project.toString()}`;
+	const signature = omitted.join('\n');
+	if (signature === context.workspaceState.get<string>(key)) return;
+	// Best effort: a failed write repeats a warning next time rather than losing one.
+	void context.workspaceState
+		.update(key, signature)
+		.then(undefined, (error: unknown) => log(`Could not remember the omission warning shown: ${String(error)}`));
 	if (omitted.length === 0) return;
 
 	const folders = selection.folders.length ? ' The micro:bit filesystem has no folders.' : '';

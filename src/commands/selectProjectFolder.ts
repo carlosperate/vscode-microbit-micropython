@@ -6,12 +6,8 @@ import { chooseWorkspaceFolder } from '../files/workspace';
 import { log } from '../log';
 
 /**
- * Nominates a folder as the micro:bit project, from the Explorer context menu or
- * from the palette.
- *
- * Right-clicking a folder hands the URI straight in, so the dialog only opens
- * when the command arrives without one. Either way the answer is an absolute URI
- * that has to be proved to be inside a workspace folder before it is stored.
+ * Stores a project folder selected through the Explorer or a folder dialog.
+ * Both entry points return absolute URIs that must remain inside a workspace.
  */
 export async function selectProjectFolder(_context: vscode.ExtensionContext, clicked?: unknown): Promise<void> {
 	if (!vscode.workspace.workspaceFolders?.length) {
@@ -19,8 +15,7 @@ export async function selectProjectFolder(_context: vscode.ExtensionContext, cli
 		return;
 	}
 
-	// The dialog and the settings write both reach a filesystem provider, and an
-	// unguarded rejection is VS Code's own modal with nothing about the micro:bit.
+	// Both the dialog and resource-scoped setting can reject through their providers.
 	try {
 		const chosen = clicked instanceof vscode.Uri ? clicked : await askForFolder();
 		// Dismissing the dialog changes nothing and says nothing.
@@ -35,8 +30,7 @@ export async function selectProjectFolder(_context: vscode.ExtensionContext, cli
 			return;
 		}
 
-		// `WorkspaceFolder`, so it lands in that folder's own settings where a class
-		// can share it. Anything wider follows the user to their next project.
+		// Workspace-folder scope keeps the setting shareable without following the user.
 		await vscode.workspace
 			.getConfiguration(SECTION, workspace.uri)
 			.update(SETTINGS.projectFolder, path, vscode.ConfigurationTarget.WorkspaceFolder);

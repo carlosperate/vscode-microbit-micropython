@@ -1,4 +1,4 @@
-import { DeviceError, type DeviceErrorCode } from '@microbit/microbit-connection';
+import { DeviceError, FlashDataError, type DeviceErrorCode } from '@microbit/microbit-connection';
 
 import { PRODUCT } from '../config';
 
@@ -8,8 +8,7 @@ const FIRMWARE_UPDATE = 'https://microbit.org/get-started/user-guide/firmware/';
 /** The way to program a board that is open on every host and every browser. */
 const SAVE_HEX = `Use "${PRODUCT}: Save Hex" instead, then copy the file onto the MICROBIT drive.`;
 
-/** Said on both hosts, so it names no browser. */
-export const NO_WEBUSB = `WebUSB is not available here, so a micro:bit cannot be connected. ${SAVE_HEX}`;
+export const NO_WEBUSB = `this feature needs a WebUSB capable browser like Chrome or Edge. ${SAVE_HEX}`;
 
 /**
  * Nothing on this host can ask for permission to use a board. Desktop VS Code
@@ -32,6 +31,10 @@ export const CHOOSER_REFUSED =
 export const WRONG_BOARD =
 	'that is a different micro:bit from the one you picked, so it has been disconnected. Unplug the others and ' +
 	'connect again.';
+
+/** Caught before `flash()` runs, so nothing was written and nothing was halted. */
+export const BOARD_CHANGED =
+	'the micro:bit changed while this was being prepared, so nothing was sent. Connect again and flash once more.';
 
 /** Pairing succeeded on something this extension cannot then talk to. */
 export const NOT_A_MICROBIT =
@@ -77,6 +80,8 @@ const UNRECOGNISED = 'the micro:bit could not be reached, see the output for why
  * the detail in the output channel.
  */
 export function explainDevice(error: unknown): string | undefined {
+	// The library rethrows this one untouched, so its message is always ours.
+	if (error instanceof FlashDataError) return error.message;
 	if (!(error instanceof DeviceError)) return UNRECOGNISED;
 	// A code added upstream between the pinned version and the installed one.
 	return error.code in MESSAGES ? MESSAGES[error.code] : UNRECOGNISED;

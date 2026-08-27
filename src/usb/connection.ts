@@ -3,7 +3,12 @@
  * needs a board goes through. Module level for the same reason the output
  * channel is: a command handler has no other way to reach it.
  */
-import { ConnectionStatus, type BoardVersion } from '@microbit/microbit-connection';
+import {
+	ConnectionStatus,
+	type BoardVersion,
+	type FlashDataSource,
+	type ProgressCallback,
+} from '@microbit/microbit-connection';
 import {
 	createUSBConnection,
 	DeviceSelectionMode,
@@ -13,7 +18,16 @@ import * as vscode from 'vscode';
 
 import { PRODUCT } from '../config';
 import { log } from '../log';
-import { CHOOSER_REFUSED, describeError, explainDevice, NO_PAIRING, NOT_A_MICROBIT, WRONG_BOARD } from '../ui/errors';
+import {
+	BOARD_CHANGED,
+	CHOOSER_REFUSED,
+	describeError,
+	explainDevice,
+	NO_PAIRING,
+	NO_WEBUSB,
+	NOT_A_MICROBIT,
+	WRONG_BOARD,
+} from '../ui/errors';
 import { createStatusBar, type StatusBar } from '../ui/statusbar';
 import { connectToBoard, isMicrobit, MICROBIT_FILTER, type Outcome, type UsbIdentity } from './connect';
 
@@ -38,6 +52,13 @@ const IDLE: ConnectionStatus[] = [ConnectionStatus.NoAuthorizedDevice, Connectio
  */
 const RESETTLE_MS = 1500;
 
+/**
+ * How much of a flash has to pass before the library calls back again. Its
+ * default of 0.0025 is about 400 crossings of the worker boundary for a bar
+ * nobody can read that fast; this gives 50 and a smooth one.
+ */
+const PROGRESS_STEP = 0.02;
+
 let connection: MicrobitUSBConnection | undefined;
 let statusBar: StatusBar | undefined;
 let recovering = false;
@@ -51,6 +72,13 @@ let attempt: Promise<Attempted> | undefined;
 
 /** Asked for back mid-connect. A chooser is the host's window and cannot be closed from here. */
 let releaseWhenIdle = false;
+
+/**
+ * The flash in flight. Taking the device away during one leaves the board halted
+ * part-written, and the library's own cleanup dereferences the device it no
+ * longer has, so everything that could disconnect has to see this.
+ */
+let writing: Promise<boolean> | undefined;
 
 /** A finished attempt, either way, since callers word failure differently. */
 type Attempted = { outcome: Outcome } | { error: unknown };
@@ -84,7 +112,12 @@ export function createBoard(context: vscode.ExtensionContext): void {
 
 	const onStatus = ({ status, previousStatus }: { status: ConnectionStatus; previousStatus: ConnectionStatus }) => {
 		bar.update(status, versionOf(board));
-		if (status === ConnectionStatus.NoAuthorizedDevice && LIVE.includes(previousStatus)) void recover(board);
+		if (status !== ConnectionStatus.NoAuthorizedDevice || !LIVE.includes(previousStatus)) return;
+
+		// Read here rather than inside `recover`, which waits before it looks: a
+		// cable pulled mid-flash reports its own failure and is already unwinding,
+		// and a second message plus a reconnect racing that unwind helps nobody.
+		if (!writing) void recover(board);
 	};
 	board.addEventListener('status', onStatus);
 	board.addEventListener('beforerequestdevice', chooserWasReached);
@@ -139,6 +172,9 @@ export async function shutdownBoard(): Promise<void> {
 	const board = connection;
 	if (!board) return;
 
+	// Let a write finish rather than pulling the device out from under it.
+	await writing?.then(undefined, () => undefined);
+
 	// A connect still running would otherwise land after this returns.
 	if (attempt) releaseWhenIdle = true;
 	if (IDLE.includes(board.status)) return;
@@ -175,6 +211,12 @@ export async function connectBoard(): Promise<boolean> {
 	if (!board) return false;
 	if (board.status === ConnectionStatus.Connected) return true;
 
+	// Otherwise a Firefox-shaped failure reads as a blocked chooser, not this.
+	if (!(await usbAvailable())) {
+		warn(NO_WEBUSB);
+		return false;
+	}
+
 	const attempted = await connectOnce(board, true);
 	if ('error' in attempted) {
 		log(`Could not connect: ${describeError(attempted.error)}`);
@@ -187,8 +229,16 @@ export async function connectBoard(): Promise<boolean> {
 
 export async function disconnectBoard(): Promise<void> {
 	const board = connection;
-	if (!board || (IDLE.includes(board.status) && !attempt)) {
+	if (!board || (IDLE.includes(board.status) && !attempt && !writing)) {
 		void vscode.window.showInformationMessage(`${PRODUCT}: no micro:bit is connected.`);
+		return;
+	}
+
+	// Taking the device away mid-write leaves the board halted and part-written.
+	if (writing) {
+		void vscode.window.showWarningMessage(
+			`${PRODUCT}: copying to the micro:bit right now. Wait for that to finish before disconnecting.`
+		);
 		return;
 	}
 
@@ -211,6 +261,63 @@ export async function disconnectBoard(): Promise<void> {
  * first time a cable came out between one menu and the next.
  */
 export const boardAttached = (): boolean => connection !== undefined && !IDLE.includes(connection.status);
+
+/** Which micro:bit is on the other end, which decides the image a hex is built from. */
+export const boardVersion = (): BoardVersion | undefined => (connection ? versionOf(connection) : undefined);
+
+/** Which physical board is on the other end, so a same-version swap is still visible. */
+export const boardSerialNumber = (): string | undefined =>
+	(connection ? connection.getDevice()?.serialNumber : undefined) ?? undefined;
+
+/** The board a hex was built for, checked again immediately before it is sent. */
+export interface ExpectedBoard {
+	version: BoardVersion;
+	serialNumber: string | undefined;
+}
+
+/**
+ * Writes a hex to the board, refusing first if it is no longer `expected`.
+ * `source` is only asked for data once the target is halted, so this check, like
+ * everything else that can refuse, has to run before `flash()` is called at all.
+ */
+export function flashBoard(expected: ExpectedBoard, source: FlashDataSource, progress: ProgressCallback): Promise<boolean> {
+	const board = connection;
+	// One write at a time, enforced here and not only by the command's own guard.
+	if (!board || writing) return Promise.resolve(false);
+
+	if (!matchesExpected(board, expected)) {
+		warn(BOARD_CHANGED);
+		return Promise.resolve(false);
+	}
+
+	writing = write(board, source, progress).finally(() => {
+		writing = undefined;
+	});
+	return writing;
+}
+
+/** No serial number on either side means unconfirmable, not mismatched, same as `connect.ts`. */
+function matchesExpected(board: MicrobitUSBConnection, expected: ExpectedBoard): boolean {
+	if (board.status !== ConnectionStatus.Connected) return false;
+	if (versionOf(board) !== expected.version) return false;
+	if (expected.serialNumber && board.getDevice()?.serialNumber !== expected.serialNumber) return false;
+	return true;
+}
+
+async function write(
+	board: MicrobitUSBConnection,
+	source: FlashDataSource,
+	progress: ProgressCallback
+): Promise<boolean> {
+	try {
+		await board.flash(source, { partial: true, progress, minimumProgressIncrement: PROGRESS_STEP });
+		return true;
+	} catch (error) {
+		log(`The flash failed: ${describeError(error)}`);
+		warn(explainDevice(error));
+		return false;
+	}
+}
 
 /**
  * Whether this host can talk to USB at all. The library owns the probe: its
@@ -268,13 +375,13 @@ async function runConnect(board: MicrobitUSBConnection, mayPair: boolean): Promi
 	}
 }
 
-function report(board: MicrobitUSBConnection, outcome: Outcome): boolean {
+async function report(board: MicrobitUSBConnection, outcome: Outcome): Promise<boolean> {
 	switch (outcome.done) {
 		case 'connected':
 			return true;
 		case 'wrong-board':
-			// Live, and not the board the user picked, so it is given straight back.
-			void board.disconnect().then(undefined, () => undefined);
+			// Awaited: an immediate retry must find it gone, not still `Connected`.
+			await board.disconnect().then(undefined, (error: unknown) => log(`Could not release: ${describeError(error)}`));
 			warn(WRONG_BOARD);
 			return false;
 		// The user closed the chooser, so they know, and there is nothing to add.
