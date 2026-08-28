@@ -2,11 +2,13 @@ import * as vscode from 'vscode';
 
 import { connect, disconnect } from './commands/board';
 import { flash } from './commands/flash';
+import { openTerminal } from './commands/openTerminal';
 import { saveHex } from './commands/saveHex';
 import { selectProjectFolder } from './commands/selectProjectFolder';
 import { showMenu } from './commands/showMenu';
 import { COMMANDS, PRODUCT, type CommandId } from './config';
 import { createLog, log } from './log';
+import { createSerialMonitor } from './serial/eclipse';
 import { createBoard, shutdownBoard } from './usb/connection';
 
 /** Implemented commands, keyed by the typed ids also registered below. */
@@ -18,6 +20,7 @@ const IMPLEMENTED: Partial<
 	[COMMANDS.selectProjectFolder]: selectProjectFolder,
 	[COMMANDS.connect]: connect,
 	[COMMANDS.disconnect]: disconnect,
+	[COMMANDS.openTerminal]: openTerminal,
 	[COMMANDS.showMenu]: showMenu,
 };
 
@@ -25,6 +28,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	createLog(context);
 	log('Extension activated');
 
+	createSerialMonitor(context);
 	createBoard(context);
 
 	// Manifest titles keep stub notifications in sync with the command palette.

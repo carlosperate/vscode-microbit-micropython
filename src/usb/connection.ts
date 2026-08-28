@@ -18,6 +18,8 @@ import * as vscode from 'vscode';
 
 import { PRODUCT } from '../config';
 import { log } from '../log';
+import { SerialWriteGate } from '../serial/transport';
+import type { SerialTransport } from '../serial/types';
 import {
 	BOARD_CHANGED,
 	CHOOSER_REFUSED,
@@ -37,7 +39,7 @@ import { connectToBoard, isMicrobit, MICROBIT_FILTER, type Outcome, type UsbIden
  * the class that would and never instantiates it, so a board can be used there
  * and never authorised.
  */
-const REQUEST_USB_DEVICE = 'workbench.experimental.requestUsbDevice';
+export const REQUEST_USB_DEVICE = 'workbench.experimental.requestUsbDevice';
 
 /** The statuses a board was reachable in, so losing one is worth reacting to. */
 const LIVE: ConnectionStatus[] = [ConnectionStatus.Connected, ConnectionStatus.Paused];
@@ -60,6 +62,7 @@ const RESETTLE_MS = 1500;
 const PROGRESS_STEP = 0.02;
 
 let connection: MicrobitUSBConnection | undefined;
+let serialTransport: SerialWriteGate | undefined;
 let statusBar: StatusBar | undefined;
 let recovering = false;
 
@@ -121,12 +124,31 @@ export function createBoard(context: vscode.ExtensionContext): void {
 	};
 	board.addEventListener('status', onStatus);
 	board.addEventListener('beforerequestdevice', chooserWasReached);
+	const transport = new SerialWriteGate({
+		onData: (listener) => {
+			const wrapped = ({ data }: { data: string }) => listener(data);
+			board.addEventListener('serialdata', wrapped);
+			return () => board.removeEventListener('serialdata', wrapped);
+		},
+		onDisconnect: (listener) => {
+			const wrapped = () => {
+				if (!boardAttached()) listener();
+			};
+			board.addEventListener('status', wrapped);
+			return () => board.removeEventListener('status', wrapped);
+		},
+		write: async (data) => {
+			if (board.status === ConnectionStatus.Connected) await board.serialWrite(data);
+		},
+	});
 
 	connection = board;
+	serialTransport = transport;
 	statusBar = bar;
 	context.subscriptions.push({
 		dispose: () => {
 			connection = undefined;
+			serialTransport = undefined;
 			statusBar = undefined;
 			board.removeEventListener('status', onStatus);
 			board.removeEventListener('beforerequestdevice', chooserWasReached);
@@ -172,18 +194,20 @@ export async function shutdownBoard(): Promise<void> {
 	const board = connection;
 	if (!board) return;
 
-	// Let a write finish rather than pulling the device out from under it.
-	await writing?.then(undefined, () => undefined);
+	await withSerialWritesBlocked(async () => {
+		// Let a flash finish rather than pulling the device out from under it.
+		await writing?.then(undefined, () => undefined);
 
-	// A connect still running would otherwise land after this returns.
-	if (attempt) releaseWhenIdle = true;
-	if (IDLE.includes(board.status)) return;
+		// A connect still running would otherwise land after this returns.
+		if (attempt) releaseWhenIdle = true;
+		if (IDLE.includes(board.status)) return;
 
-	try {
-		await board.disconnect();
-	} catch (error) {
-		log(`Could not hand the micro:bit back on shutdown: ${describeError(error)}`);
-	}
+		try {
+			await board.disconnect();
+		} catch (error) {
+			log(`Could not hand the micro:bit back on shutdown: ${describeError(error)}`);
+		}
+	});
 }
 
 /**
@@ -251,7 +275,7 @@ export async function disconnectBoard(): Promise<void> {
 		return;
 	}
 
-	await board.disconnect();
+	await withSerialWritesBlocked(() => board.disconnect());
 	void vscode.window.showInformationMessage(`${PRODUCT}: the micro:bit is disconnected.`);
 }
 
@@ -261,6 +285,10 @@ export async function disconnectBoard(): Promise<void> {
  * first time a cable came out between one menu and the next.
  */
 export const boardAttached = (): boolean => connection !== undefined && !IDLE.includes(connection.status);
+
+/** The terminal sees only the serial operations coordinated by this module. */
+export const getSerialTransport = (): SerialTransport | undefined =>
+	boardAttached() ? serialTransport : undefined;
 
 /** Which micro:bit is on the other end, which decides the image a hex is built from. */
 export const boardVersion = (): BoardVersion | undefined => (connection ? versionOf(connection) : undefined);
@@ -310,7 +338,9 @@ async function write(
 	progress: ProgressCallback
 ): Promise<boolean> {
 	try {
-		await board.flash(source, { partial: true, progress, minimumProgressIncrement: PROGRESS_STEP });
+		await withSerialWritesBlocked(() =>
+			board.flash(source, { partial: true, progress, minimumProgressIncrement: PROGRESS_STEP })
+		);
 		return true;
 	} catch (error) {
 		log(`The flash failed: ${describeError(error)}`);
@@ -344,7 +374,9 @@ function connectOnce(board: MicrobitUSBConnection, mayPair: boolean): Promise<At
 		attempt = undefined;
 		if (releaseWhenIdle) {
 			releaseWhenIdle = false;
-			void board.disconnect().then(undefined, (error: unknown) => log(`Could not release: ${describeError(error)}`));
+			void withSerialWritesBlocked(() => board.disconnect()).then(undefined, (error: unknown) =>
+				log(`Could not release: ${describeError(error)}`)
+			);
 		}
 	});
 	return attempt;
@@ -381,7 +413,9 @@ async function report(board: MicrobitUSBConnection, outcome: Outcome): Promise<b
 			return true;
 		case 'wrong-board':
 			// Awaited: an immediate retry must find it gone, not still `Connected`.
-			await board.disconnect().then(undefined, (error: unknown) => log(`Could not release: ${describeError(error)}`));
+			await withSerialWritesBlocked(() => board.disconnect()).then(undefined, (error: unknown) =>
+				log(`Could not release: ${describeError(error)}`)
+			);
 			warn(WRONG_BOARD);
 			return false;
 		// The user closed the chooser, so they know, and there is nothing to add.
@@ -460,6 +494,9 @@ function versionOf(board: MicrobitUSBConnection): BoardVersion | undefined {
 }
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const withSerialWritesBlocked = <T>(operation: () => Promise<T>): Promise<T> =>
+	serialTransport ? serialTransport.withWritesBlocked(operation) : operation();
 
 const warn = (message: string | undefined) => {
 	if (message) void vscode.window.showErrorMessage(`${PRODUCT}: ${message}`);

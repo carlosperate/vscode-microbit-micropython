@@ -10,12 +10,9 @@ export interface Step {
 }
 
 /**
- * All seven stages, including the two that only fire on native platforms, so a
- * version bump cannot render a blank label. `withProgress`'s own notification
- * renderer joins a non-empty `title` and a reported `message` as `${title}: ${message}`
- * unconditionally (`withNotificationProgress` in the workbench), so a static
- * title cannot end in a period: it would always read "…: detail". Every detail
- * here is instead the full sentence, and the caller passes no title at all.
+ * Covers native-only stages so a version bump cannot render a blank label.
+ * Callers omit a static title because VS Code joins it to every message with
+ * `: `; each detail is therefore a complete notification.
  */
 const DETAILS: Record<ProgressStage, string> = {
 	Initializing: 'Getting ready',

@@ -24,6 +24,7 @@
   "devDependencies": {
     "@types/node": "^24.10.1",
     "@types/vscode": "1.91.0",
+    "@types/w3c-web-serial": "^1.0.8",
     "@types/w3c-web-usb": "1.0.14",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/test-web": "^0.0.81",
@@ -35,6 +36,9 @@
     "vscode": "^1.91.0"
   },
   "browser": "./dist/extension.js",
+  "extensionPack": [
+    "eclipse-cdt.serial-monitor"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/carlosperate/vscode-microbit-micropython.git"

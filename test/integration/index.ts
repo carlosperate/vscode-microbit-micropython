@@ -1,7 +1,7 @@
 import { microbitBoardId } from '@microbit/microbit-fs';
 import * as vscode from 'vscode';
 
-import { COMMANDS, SECTION, SETTINGS } from '../../src/config';
+import { COMMANDS, SECTION, SERIAL_MONITOR_EXTENSION, SETTINGS } from '../../src/config';
 import { hexFilename } from '../../src/filename';
 import { chooseWorkspaceFolder, resolveProject, selectWorkspaceFiles } from '../../src/files/workspace';
 import { readFirmware } from '../../src/hex/assets';
@@ -49,6 +49,7 @@ export async function run(): Promise<void> {
 
 	await checkActivation(extension);
 	await checkContributedCommandsResolve(extension);
+	await checkSerialMonitorCompanion();
 	await checkSelectionOnTheRealWorkspace();
 	const built = await checkHexBuildsFromTheRealWorkspace(extension);
 	if (built) await checkTheHexSurvivesBeingSaved(built);
@@ -383,6 +384,45 @@ async function checkContributedCommandsResolve(extension: vscode.Extension<unkno
 			? `${missing.length} of ${contributed.length} contributed but never registered: ${missing.join(', ')}`
 			: `all ${contributed.length} contributed commands are registered`
 	);
+}
+
+/** A companion pass loads the real Eclipse extension; the base harness deliberately does not. */
+async function checkSerialMonitorCompanion(): Promise<void> {
+	const provider = vscode.extensions.getExtension(SERIAL_MONITOR_EXTENSION);
+	const command = await waitForCommand('serial-monitor.openSerial');
+	if (!provider && !command) {
+		console.log('[test] SKIP  Eclipse Serial Monitor is not installed in this harness');
+		return;
+	}
+
+	record(
+		'Eclipse Serial Monitor contributes its command',
+		command,
+		command ? 'serial-monitor.openSerial is registered' : 'the extension is present but its command is absent'
+	);
+	if (vscode.env.uiKind === vscode.UIKind.Desktop || !provider) return;
+
+	try {
+		const exported = (await provider.activate()) as { getApi?(version: 2): Record<string, unknown> } | undefined;
+		const api = exported?.getApi?.(2);
+		const methods = ['openSerial', 'revealSerial', 'pauseSerial', 'resumeSerial', 'listPorts'];
+		const missing = methods.filter((method) => typeof api?.[method] !== 'function');
+		record(
+			'Eclipse Serial Monitor exposes API v2 in the web host',
+			missing.length === 0,
+			missing.length ? `missing ${missing.join(', ')}` : 'all serial API methods are present'
+		);
+	} catch (error) {
+		record('Eclipse Serial Monitor exposes API v2 in the web host', false, String(error));
+	}
+}
+
+async function waitForCommand(command: string): Promise<boolean> {
+	for (let attempt = 0; attempt < 20; attempt++) {
+		if ((await vscode.commands.getCommands(true)).includes(command)) return true;
+		await new Promise<void>((resolve) => setTimeout(resolve, 100));
+	}
+	return false;
 }
 
 /**

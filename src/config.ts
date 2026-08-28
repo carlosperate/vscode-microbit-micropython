@@ -34,3 +34,6 @@ export const settingId = (key: (typeof SETTINGS)[keyof typeof SETTINGS]) => `${S
  * toolchains and matches the manifest display name and command categories.
  */
 export const PRODUCT = 'BBC micro:bit MicroPython';
+
+/** The Open VSX companion that owns every serial terminal. */
+export const SERIAL_MONITOR_EXTENSION = 'eclipse-cdt.serial-monitor';

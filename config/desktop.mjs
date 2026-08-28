@@ -28,6 +28,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
 const bench = path.join(root, 'test', 'workspace');
 const testing = process.argv.includes('--test');
+const serialMonitorArgument = process.argv.find((argument) => argument.startsWith('--serial-monitor-path='));
+const serialMonitorPath = serialMonitorArgument?.slice('--serial-monitor-path='.length);
+const developmentPaths = serialMonitorPath ? [root, path.resolve(serialMonitorPath)] : [root];
 
 /** The limit is on the socket path, so it is the socket that gets measured. */
 const SOCKET_LIMIT = 103;
@@ -141,7 +144,7 @@ if (testing) {
 	// well, so one bundle serves both runs.
 	try {
 		await runTests({
-			extensionDevelopmentPath: root,
+			extensionDevelopmentPath: developmentPaths,
 			extensionTestsPath: path.join(root, 'test', 'integration', 'dist', 'index.js'),
 			extensionTestsEnv: clearedVscodeVars(),
 			launchArgs,
@@ -161,7 +164,7 @@ if (testing) {
 	const args = [
 		// Absolute: VS Code resolves a relative path here against its own cwd, not
 		// the shell's, and then quietly opens a window with no extension in it.
-		`--extensionDevelopmentPath=${root}`,
+		...developmentPaths.map((developmentPath) => `--extensionDevelopmentPath=${developmentPath}`),
 		...launchArgs,
 	];
 	spawn(executable, args, { stdio: 'inherit', env: cleanEnv() }).on('exit', (status) => process.exit(status ?? 0));

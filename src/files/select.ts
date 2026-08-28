@@ -1,8 +1,6 @@
 /**
- * Which workspace files go onto the board. The device filesystem is flat, so
- * only the root is a candidate. Every rule below is enforced here because
- * `@microbit/microbit-fs` enforces none of them until hex generation, where it
- * throws bare `Error`s carrying no filename.
+ * Selects direct project files for the board's flat filesystem. Invalid inputs
+ * are rejected here because `microbit-fs` reports them late without filenames.
  */
 
 /** The device's own limit, counted in bytes rather than characters. */
@@ -35,11 +33,7 @@ export interface Selection {
 	skipped: Skipped[];
 }
 
-/**
- * The workspace root, and a file directly inside it. There is no way to reach a
- * subfolder from here, which is the point: naming a folder costs nothing however
- * much it holds. `PromiseLike` because `workspace.fs` returns `Thenable`.
- */
+/** Readers cannot enter subfolders; `PromiseLike` accepts VS Code's `Thenable`. */
 type ReadDir = () => PromiseLike<DirEntry[]>;
 type ReadFile = (name: string) => PromiseLike<Uint8Array>;
 
@@ -52,17 +46,13 @@ export async function selectFiles(
 	const folders: string[] = [];
 	const skipped: Skipped[] = [];
 
-	// By code unit, not `localeCompare`, whose order follows the host's locale:
-	// two flashes of an unchanged workspace must produce identical bytes.
+	// Code-unit order is deterministic across host locales.
 	const entries = [...(await readDir())].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 
 	for (const entry of entries) {
 		const { name } = entry;
 
-		// The user's own instructions come first, and they rule out a folder as
-		// readily as a file. Recorded rather than named: `.git` and `.vscode` are
-		// in every real workspace, but somebody asking whether their exclude took
-		// effect still has to be able to find the answer.
+		// Dotfiles and configured exclusions remain recorded for diagnostics.
 		const ruledOut = name.startsWith('.') ? 'dotfile' : isExcluded(name, exclude) ? 'excluded' : undefined;
 		if (ruledOut) {
 			skipped.push({ name, reason: ruledOut, notable: false });
@@ -74,8 +64,7 @@ export async function selectFiles(
 			continue;
 		}
 
-		// A saved hex lands beside the code, and taking it back in refuses the next
-		// build over a file nobody wrote. Case folded: FAT hands names back shouting.
+		// Build outputs cannot fit on the device and FAT may return their names uppercased.
 		if (name.toLowerCase().endsWith('.hex')) {
 			skipped.push({ name, reason: 'build-output', notable: false });
 			continue;
@@ -89,8 +78,7 @@ export async function selectFiles(
 
 		const data = await readFile(name);
 		if (data.length === 0) {
-			// Nobody expects an empty `notes.txt` on a board; an empty `main.py` is
-			// a learner wondering why nothing happened.
+			// An empty Python file can otherwise look like a successful program that does nothing.
 			skipped.push({ name, reason: 'empty', notable: name.endsWith('.py') });
 			continue;
 		}
@@ -111,11 +99,7 @@ function badName(name: string): SkipReason | undefined {
 const isExcluded = (name: string, exclude: readonly string[]) =>
 	exclude.some((pattern) => matches(name, pattern));
 
-/**
- * `*` and `?` over one filename. Escape everything first, which leaves the two
- * wildcards untouched because neither is in that set, then let them through.
- * A pattern spanning directories has nothing here to match, so no glob library.
- */
+/** Matches `*` and `?` over one filename; directories are never candidates. */
 function matches(name: string, pattern: string): boolean {
 	const expression = pattern
 		.replace(/[.+^${}()|[\]\\]/g, '\\$&')

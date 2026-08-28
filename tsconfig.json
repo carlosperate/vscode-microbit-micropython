@@ -14,7 +14,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "lib": ["ES2020", "WebWorker"],
-    "types": ["vscode", "w3c-web-usb"]
+    "types": ["vscode", "w3c-web-serial", "w3c-web-usb"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
