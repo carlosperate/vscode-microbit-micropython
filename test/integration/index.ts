@@ -56,6 +56,7 @@ export async function run(): Promise<void> {
 	await checkSelectionFollowsTheProjectFolder();
 	await reportWebUsb();
 	await checkTheChooserIsNeverReached(await reportTheUsbBridge());
+	await checkAHostileNavigatorIsSurvived(extension);
 
 	// Last, and never in the middle. Replacing workspace folder 0 may terminate
 	// and restart every running extension, this script included, so anything after
@@ -507,6 +508,47 @@ async function checkTheChooserIsNeverReached(bridged: boolean): Promise<void> {
 		record(name, expected, `outcome=${outcome.done}, pairing asked=${asked}, connect called=${connected}`);
 	} catch (error) {
 		record(name, false, String(error));
+	}
+}
+
+/**
+ * Some privacy extensions replace `navigator.usb` with a getter that throws, and
+ * the connection library reads that property unguarded in its availability check,
+ * its `initialize()` and its `dispose()`. Every guard against it is ours.
+ *
+ * Only a real host can show this working: the reads are the library's, and it is
+ * the extension's own live connection that has to survive them.
+ *
+ * **This covers the availability check and nothing else.** Activation is long over
+ * by the time any test script loads, and disposal happens after this restores the
+ * property, so the guards on those two are carried by inspection rather than by a
+ * check. What is exercised is the command every WebUSB path goes through, which
+ * has to refuse rather than throw.
+ */
+async function checkAHostileNavigatorIsSurvived(extension: vscode.Extension<unknown>): Promise<void> {
+	const name = 'a navigator.usb that throws is refused, not fatal';
+	const original = Object.getOwnPropertyDescriptor(navigator, 'usb');
+	try {
+		Object.defineProperty(navigator, 'usb', {
+			configurable: true,
+			get() {
+				throw new Error('navigator.usb is blocked');
+			},
+		});
+	} catch (error) {
+		console.log(`[test] SKIP  navigator.usb cannot be replaced in this host: ${String(error)}`);
+		return;
+	}
+
+	try {
+		await vscode.commands.executeCommand(COMMANDS.connect);
+		record(name, extension.isActive, `${COMMANDS.connect} returned, isActive=${extension.isActive}`);
+	} catch (error) {
+		record(name, false, `${COMMANDS.connect} threw: ${String(error)}`);
+	} finally {
+		// Deleting the shadow puts the prototype's own getter back in view.
+		if (original) Object.defineProperty(navigator, 'usb', original);
+		else Reflect.deleteProperty(navigator, 'usb');
 	}
 }
 

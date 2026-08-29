@@ -65,6 +65,25 @@ describe('the WebUSB Web Serial adapter', () => {
 		expect(transport.writes.join('')).toBe('café');
 	});
 
+	/**
+	 * The terminal writes a keystroke at a time from its own fresh writer, without
+	 * waiting for the last one and releasing the lock straight away, which is a
+	 * different shape from the awaited writes above. A character the board's line
+	 * editor then ignores, such as `é`, has to leave this side whole, or there is
+	 * no telling the two losses apart.
+	 */
+	it('keeps a keystroke whole when written the way a terminal writes', async () => {
+		await port.open({ baudRate: SERIAL_BAUD_RATE });
+		for (const keystroke of ["'", 'é', "'", '\r']) {
+			const writer = port.writable!.getWriter();
+			void writer.write(new TextEncoder().encode(keystroke));
+			writer.releaseLock();
+		}
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(transport.writes.join('')).toBe("'é'\r");
+	});
+
 	it('passes Ctrl-C and Ctrl-D through unchanged', async () => {
 		await port.open({ baudRate: SERIAL_BAUD_RATE });
 		const writer = port.writable!.getWriter();

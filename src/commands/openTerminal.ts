@@ -51,7 +51,12 @@ export async function openTerminal(): Promise<void> {
 async function openWebUsb(): Promise<boolean> {
 	if (!(await connectBoard())) return false;
 	const transport = getSerialTransport();
-	if (!transport) return false;
+	if (!transport) {
+		// The board left between connecting and here, and the UI says so; this is the
+		// only trace of why no terminal opened.
+		log('The micro:bit was gone before a terminal could be opened');
+		return false;
+	}
 
 	return openEclipseSerial(
 		'webusb',

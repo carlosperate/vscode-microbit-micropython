@@ -124,23 +124,26 @@ export function createBoard(context: vscode.ExtensionContext): void {
 	};
 	board.addEventListener('status', onStatus);
 	board.addEventListener('beforerequestdevice', chooserWasReached);
-	const transport = new SerialWriteGate({
-		onData: (listener) => {
-			const wrapped = ({ data }: { data: string }) => listener(data);
-			board.addEventListener('serialdata', wrapped);
-			return () => board.removeEventListener('serialdata', wrapped);
+	const transport = new SerialWriteGate(
+		{
+			onData: (listener) => {
+				const wrapped = ({ data }: { data: string }) => listener(data);
+				board.addEventListener('serialdata', wrapped);
+				return () => board.removeEventListener('serialdata', wrapped);
+			},
+			onDisconnect: (listener) => {
+				const wrapped = () => {
+					if (!boardAttached()) listener();
+				};
+				board.addEventListener('status', wrapped);
+				return () => board.removeEventListener('status', wrapped);
+			},
+			write: async (data) => {
+				if (board.status === ConnectionStatus.Connected) await board.serialWrite(data);
+			},
 		},
-		onDisconnect: (listener) => {
-			const wrapped = () => {
-				if (!boardAttached()) listener();
-			};
-			board.addEventListener('status', wrapped);
-			return () => board.removeEventListener('status', wrapped);
-		},
-		write: async (data) => {
-			if (board.status === ConnectionStatus.Connected) await board.serialWrite(data);
-		},
-	});
+		(characters) => log(`${characters} character(s) typed while the micro:bit was busy were discarded`)
+	);
 
 	connection = board;
 	serialTransport = transport;
@@ -152,7 +155,13 @@ export function createBoard(context: vscode.ExtensionContext): void {
 			statusBar = undefined;
 			board.removeEventListener('status', onStatus);
 			board.removeEventListener('beforerequestdevice', chooserWasReached);
-			board.dispose();
+			try {
+				// The library reads `navigator.usb` here unguarded: a hostile getter
+				// would throw and strand the status bar item.
+				board.dispose();
+			} catch (error) {
+				log(`Could not release the board connection: ${describeError(error)}`);
+			}
 			bar.dispose();
 		},
 	});
@@ -495,7 +504,13 @@ function versionOf(board: MicrobitUSBConnection): BoardVersion | undefined {
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-const withSerialWritesBlocked = <T>(operation: () => Promise<T>): Promise<T> =>
+/**
+ * Holds terminal input out of the board for the length of an operation, draining
+ * whatever was accepted before it. Writing is only the end of a flash: input
+ * handed over while the hex is still being built reaches DAPLink, which can
+ * deliver it after the reset, where it runs against the program that just landed.
+ */
+export const withSerialWritesBlocked = <T>(operation: () => Promise<T>): Promise<T> =>
 	serialTransport ? serialTransport.withWritesBlocked(operation) : operation();
 
 const warn = (message: string | undefined) => {

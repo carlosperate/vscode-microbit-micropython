@@ -4,7 +4,13 @@ import * as vscode from 'vscode';
 import { PRODUCT } from '../config';
 import { log } from '../log';
 import { createProgress } from '../ui/progress';
-import { boardSerialNumber, boardVersion, connectBoard, flashBoard } from '../usb/connection';
+import {
+	boardSerialNumber,
+	boardVersion,
+	connectBoard,
+	flashBoard,
+	withSerialWritesBlocked,
+} from '../usb/connection';
 import { hasSomethingToBuild, prepareHex, projectClause } from './prepare';
 
 /**
@@ -23,7 +29,8 @@ export async function flash(context: vscode.ExtensionContext): Promise<void> {
 
 	copying = true;
 	try {
-		await copyToBoard(context);
+		// Typing from here on is dropped: the board is on its way to a reset.
+		await withSerialWritesBlocked(() => copyToBoard(context));
 	} finally {
 		copying = false;
 	}

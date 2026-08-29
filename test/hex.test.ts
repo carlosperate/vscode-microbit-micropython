@@ -243,6 +243,7 @@ describe('the size of the device filesystem', () => {
 	const ALLOWED = new Map<number, string>([
 		[0x0d28, "the micro:bit's USB vendor id, which is the library's own device filter and not a size"],
 		[1500, 'milliseconds spent waiting for the USB bus to settle after a board disappears'],
+		[2000, 'milliseconds a hold waits for terminal input already accepted to reach the board'],
 		[115200, "the micro:bit's serial baud rate"],
 	]);
 
