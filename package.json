@@ -14,9 +14,9 @@
     "test:integration": "npm run build && npm run build:integration && vscode-test-web --quality stable --headless --extensionDevelopmentPath=. --extensionTestsPath=./test/integration/dist/index.js ./test/workspace",
     "test:integration:desktop": "npm run build && npm run build:integration && node config/desktop.mjs --test",
     "serve": "npm run build && vscode-test-web --quality stable --browser=none --port=3000 --extensionDevelopmentPath=. ./test/workspace",
-    "serve:extra-extensions": "npm run serve -- --extensionId=eclipse-cdt.serial-monitor",
+    "serve:extra-extensions": "npm run serve -- --extensionId=eclipse-cdt.serial-monitor --extensionId=carlosperate.micropython-lsp",
     "chrome": "npm run build && vscode-test-web --quality stable --browser=chromium --extensionDevelopmentPath=. ./test/workspace",
-    "chrome:extra-extensions": "npm run chrome -- --extensionId=eclipse-cdt.serial-monitor",
+    "chrome:extra-extensions": "npm run chrome -- --extensionId=eclipse-cdt.serial-monitor --extensionId=carlosperate.micropython-lsp",
     "desktop": "npm run build && node config/desktop.mjs",
     "desktop:extra-extensions": "npm run desktop -- --extra-extensions"
   },
@@ -44,7 +44,8 @@
     "ui"
   ],
   "extensionPack": [
-    "eclipse-cdt.serial-monitor"
+    "eclipse-cdt.serial-monitor",
+    "carlosperate.micropython-lsp"
   ],
   "repository": {
     "type": "git",

@@ -57,8 +57,12 @@ subfolder, run the **Select Project Folder** command to select it.
   WebUSB flashing and Serial Terminal.
     - Firefox also supports the Serial Terminal, using Web Serial instead.
     - Desktop VS Code needs no WebUSB: it copies to the `MICROBIT` drive.
-- The Eclipse Serial Monitor extension is installed automatically with this
-  extension, used to open a serial terminal.
+- The [Eclipse Serial Monitor extension](https://marketplace.visualstudio.com/items?itemName=eclipse-cdt.serial-monitor)
+  is installed automatically with this extension, used to open a serial
+  terminal.
+- The [MicroPython & CircuitPython IntelliSense extension](https://marketplace.visualstudio.com/items?itemName=carlosperate.micropython-lsp)
+  is installed automatically for autocomplete, type checking and inline
+  documentation.
 
 ## Licence
 
