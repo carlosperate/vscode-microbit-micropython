@@ -1,7 +1,7 @@
 # BBC micro:bit MicroPython
 
-Flash MicroPython programs to a BBC micro:bit over WebUSB, and talk to the
-board with a serial REPL 🐍🤖.
+Build and flash a MicroPython project to a BBC micro:bit, and connect to
+the device serial and REPL 🐍🤖.
 
 Works on both desktop and web versions of VS Code and compatible editors.
 

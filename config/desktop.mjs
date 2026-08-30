@@ -15,7 +15,7 @@
  * host, which is what a real desktop install gets. Forcing the web kind here
  * would test a bundle no desktop user ever loads.
  */
-import { downloadAndUnzipVSCode, runTests } from '@vscode/test-electron';
+import { downloadAndUnzipVSCode, runTests, runVSCodeCommand } from '@vscode/test-electron';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -29,6 +29,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
 const bench = path.join(root, 'test', 'workspace');
 const testing = process.argv.includes('--test');
+const extraExtensions = process.argv.includes('--extra-extensions');
 // `engines.vscode` is the floor, and its node is far older than the @types/node
 // this compiles against, so a node API newer than it compiles and then throws.
 // Only running there catches that: `--vscode-version=1.91.1`.
@@ -133,6 +134,17 @@ seedSettings(profile);
 const extensionsDir = testing
 	? path.join(profile, 'extensions')
 	: path.join(root, '.vscode-test', 'extensions');
+
+// The ids come from our own manifest, so there is one list rather than two.
+if (extraExtensions) {
+	const { extensionPack = [] } = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+	for (const id of extensionPack) {
+		await runVSCodeCommand(
+			['--install-extension', id, `--extensions-dir=${extensionsDir}`, `--user-data-dir=${profile}`],
+			{ ...(version ? { version } : {}), spawn: { env: cleanEnv() } }
+		);
+	}
+}
 
 const launchArgs = [
 	`--user-data-dir=${profile}`,
