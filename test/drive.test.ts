@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { boardVersion } from '../src/drive/details';
-import { findBoards, type DriveIo, type Machine, type Volume } from '../src/drive/volume';
+import { boardAt, findBoards, type DriveIo, type Machine, type Volume } from '../src/drive/volume';
 import { createDriveIo, machine, parseVolumes } from '../src/node/io';
 
 /** A real V1 file, `Board ID` absent, as DAPLink 0234 writes it. */
@@ -94,12 +94,12 @@ describe('reading DETAILS.TXT', () => {
  */
 describe('reading the Windows volume list', () => {
 	it('takes the bare object one volume produces', () => {
-		expect(parseVolumes('{"DriveLetter":"E:","Label":"MICROBIT"}')).toEqual([{ name: 'MICROBIT', path: 'E:' }]);
+		expect(parseVolumes('{"DeviceID":"E:","VolumeName":"MICROBIT"}')).toEqual([{ name: 'MICROBIT', path: 'E:' }]);
 	});
 
 	it('takes the array several produce', () => {
 		expect(
-			parseVolumes('[{"DriveLetter":"E:","Label":"MICROBIT"},{"DriveLetter":"F:","Label":"Backups"}]')
+			parseVolumes('[{"DeviceID":"E:","VolumeName":"MICROBIT"},{"DeviceID":"F:","VolumeName":"Backups"}]')
 		).toEqual([
 			{ name: 'MICROBIT', path: 'E:' },
 			{ name: 'Backups', path: 'F:' },
@@ -112,14 +112,14 @@ describe('reading the Windows volume list', () => {
 		expect(parseVolumes('\r\n')).toEqual([]);
 	});
 
-	/** A volume mounted into a folder has no letter, so there is nowhere to copy to. */
-	it('drops a volume with no drive letter', () => {
-		expect(parseVolumes('[{"DriveLetter":null,"Label":"MICROBIT"}]')).toEqual([]);
+	/** A drive with no letter has nowhere to copy to. */
+	it('drops a drive with no letter', () => {
+		expect(parseVolumes('[{"DeviceID":null,"VolumeName":"MICROBIT"}]')).toEqual([]);
 	});
 
 	/** An unformatted or unlabelled volume answers null, and must not become "null". */
 	it('reads a missing label as an empty name', () => {
-		expect(parseVolumes('{"DriveLetter":"E:","Label":null}')).toEqual([{ name: '', path: 'E:' }]);
+		expect(parseVolumes('{"DeviceID":"E:","VolumeName":null}')).toEqual([{ name: '', path: 'E:' }]);
 	});
 
 	/**
@@ -339,22 +339,19 @@ describe('finding a mounted micro:bit', () => {
 		await expect(findBoards(io, windows)).rejects.toThrow(/blocked by policy/);
 	});
 
-	/** The way out where the search cannot run, so it must not need the search. */
-	it('takes a mount point named by the user, without listing anything', async () => {
+	/**
+	 * Asked after a write fails, to tell a board that rebooted from one that is
+	 * still sitting there. It must not go near discovery: on Windows that means
+	 * waiting out the whole volume query a second time to word an error message.
+	 */
+	it('checks one known mount point without listing anything', async () => {
 		const io = fakeIo({}, { 'E:\\DETAILS.TXT': V2_DETAILS });
-		io.removableVolumes = () => Promise.reject(new Error('powershell.exe is blocked by policy'));
+		io.removableVolumes = () => Promise.reject(new Error('the query must not be reached'));
 
-		expect(await findBoards(io, windows, 'E:')).toEqual([{ path: 'E:', version: 'V2' }]);
+		expect(await boardAt(io, windows, 'E:')).toEqual({ path: 'E:', version: 'V2' });
 	});
 
-	/**
-	 * A named path is still checked for a board. Writing on trust would put a
-	 * megabyte of hex wherever a typo pointed, and a settings typo is likelier
-	 * than most, since this one is only ever set by hand.
-	 */
-	it('refuses a mount point named by the user that holds no board', async () => {
-		const io = fakeIo({}, { '/home/me/notes/todo.txt': 'not a board' });
-
-		expect(await findBoards(io, linux, '/home/me/notes')).toEqual([]);
+	it('reports nothing at a mount point the board has left', async () => {
+		expect(await boardAt(fakeIo({}, {}), mac, '/Volumes/MICROBIT')).toBeUndefined();
 	});
 });

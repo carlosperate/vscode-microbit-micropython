@@ -212,7 +212,6 @@ async function checkSelectionFollowsTheProjectFolder(): Promise<void> {
 			missing.ok ? 'it resolved anyway' : `problem=${missing.problem}, named=${missing.named}`
 		);
 
-		await checkTheCommandTakesAClickedFolder(folder, settings);
 	} catch (error) {
 		record(name, false, String(error));
 	} finally {
@@ -235,36 +234,6 @@ const exists = (uri: vscode.Uri) =>
 	);
 
 const remove = (uri: vscode.Uri) => vscode.workspace.fs.delete(uri).then(undefined, () => undefined);
-
-/**
- * The Explorer context menu hands the command the folder that was clicked
- * instead of opening a dialog, and that argument has to survive the registration
- * in `activate`, which forwards what it is given rather than dropping it.
- *
- * Invoked here the way the menu invokes it. What this cannot see is whether VS
- * Code renders the menu item at all: that is the `when` clause, and no API call
- * anywhere notices a typo in one.
- */
-async function checkTheCommandTakesAClickedFolder(
-	folder: vscode.WorkspaceFolder,
-	settings: vscode.WorkspaceConfiguration
-): Promise<void> {
-	const name = 'the command takes a folder it was handed';
-	await vscode.commands.executeCommand(COMMANDS.selectProjectFolder, vscode.Uri.joinPath(folder.uri, 'lib'));
-	const set = vscode.workspace.getConfiguration(SECTION, folder.uri).get(SETTINGS.projectFolder);
-	record(name, set === 'lib', `after clicking lib/, the setting reads ${JSON.stringify(set)}`);
-
-	// A dialog will go anywhere on the machine, so the same command has to refuse
-	// what is not inside the workspace rather than store it.
-	await vscode.commands.executeCommand(COMMANDS.selectProjectFolder, vscode.Uri.file('/elsewhere'));
-	const unchanged = vscode.workspace.getConfiguration(SECTION, folder.uri).get(SETTINGS.projectFolder);
-	record(
-		'a folder outside the workspace is refused',
-		unchanged === 'lib',
-		`the setting still reads ${JSON.stringify(unchanged)}`
-	);
-	await settings.update(SETTINGS.projectFolder, undefined, vscode.ConfigurationTarget.WorkspaceFolder);
-}
 
 /**
  * The selection rules are unit-tested against injected readers; this is the only

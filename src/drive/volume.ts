@@ -42,15 +42,18 @@ const LANDING_PAGE = 'MICROBIT.HTM';
 const VOLUME_NAME = /^MICROBIT[ _-]?\d*$/i;
 
 /**
- * `configured` is a mount point named by the user, still checked for a board
- * rather than written to on trust. Rejects only where a platform will not say
- * what is mounted; nothing mounted is an empty list.
+ * Rejects only where a platform will not say what is mounted; nothing mounted is
+ * an empty list.
  */
-export async function findBoards(io: DriveIo, machine: Machine, configured?: string): Promise<Board[]> {
-	const paths = configured ? [configured] : await candidates(io, machine);
+export async function findBoards(io: DriveIo, machine: Machine): Promise<Board[]> {
+	const paths = await candidates(io, machine);
 	const found = await Promise.all(paths.map((path) => identify(io, path, machine.platform)));
 	return found.filter((board): board is Board => board !== undefined);
 }
+
+/** One known mount point, for asking whether a board that was there still is. */
+export const boardAt = (io: DriveIo, machine: Machine, path: string): Promise<Board | undefined> =>
+	identify(io, path, machine.platform);
 
 async function candidates(io: DriveIo, { platform, user }: Machine): Promise<string[]> {
 	// Not caught: a refusal to say what is mounted is not the same as no board.

@@ -11,10 +11,15 @@ const run = promisify(execFile);
 /** A wedged storage service must report no board, not hang Flash forever. */
 const VOLUME_QUERY_MS = 10_000;
 
-/** `Win32_Volume` is local volumes only, so a network drive is never contacted. */
+/**
+ * `DriveType=2` is removable, so a network drive is never in the answer and
+ * never read from. **Not `Win32_Volume`**, which answers the same question and
+ * took over ten seconds on a stock CI runner with nothing blocking it; this
+ * class is the quick one.
+ */
 const VOLUME_QUERY =
-	"Get-CimInstance -ClassName Win32_Volume -Filter 'DriveType=2' | " +
-	'Select-Object DriveLetter,Label | ConvertTo-Json -Compress';
+	"Get-CimInstance -ClassName Win32_LogicalDisk -Filter 'DriveType=2' | " +
+	'Select-Object DeviceID,VolumeName | ConvertTo-Json -Compress';
 
 /**
  * Absolute, because `CreateProcess` searches the calling application's directory
@@ -59,10 +64,10 @@ export function parseVolumes(stdout: string): Volume[] {
 	const rows: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
 
 	return rows.flatMap((row) => {
-		const { DriveLetter, Label } = (row ?? {}) as { DriveLetter?: unknown; Label?: unknown };
-		// A volume mounted into a folder has no letter and nowhere to copy to.
-		if (typeof DriveLetter !== 'string' || !DriveLetter) return [];
-		return [{ name: typeof Label === 'string' ? Label : '', path: DriveLetter }];
+		const { DeviceID, VolumeName } = (row ?? {}) as { DeviceID?: unknown; VolumeName?: unknown };
+		// A drive with no letter has nowhere to copy to.
+		if (typeof DeviceID !== 'string' || !DeviceID) return [];
+		return [{ name: typeof VolumeName === 'string' ? VolumeName : '', path: DeviceID }];
 	});
 }
 

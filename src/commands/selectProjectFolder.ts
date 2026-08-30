@@ -6,10 +6,10 @@ import { chooseWorkspaceFolder } from '../files/workspace';
 import { log } from '../log';
 
 /**
- * Stores a project folder selected through the Explorer or a folder dialog.
- * Both entry points return absolute URIs that must remain inside a workspace.
+ * Stores the project folder picked from a folder dialog, which answers with an
+ * absolute URI that has to be inside a workspace folder.
  */
-export async function selectProjectFolder(_context: vscode.ExtensionContext, clicked?: unknown): Promise<void> {
+export async function selectProjectFolder(): Promise<void> {
 	if (!vscode.workspace.workspaceFolders?.length) {
 		void vscode.window.showWarningMessage(`${PRODUCT}: open a folder first, there is no project to point at.`);
 		return;
@@ -17,7 +17,7 @@ export async function selectProjectFolder(_context: vscode.ExtensionContext, cli
 
 	// Both the dialog and resource-scoped setting can reject through their providers.
 	try {
-		const chosen = clicked instanceof vscode.Uri ? clicked : await askForFolder();
+		const chosen = await askForFolder();
 		// Dismissing the dialog changes nothing and says nothing.
 		if (!chosen) return;
 

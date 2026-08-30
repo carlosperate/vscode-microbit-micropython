@@ -6,8 +6,8 @@ import * as vscode from 'vscode';
 
 import { hasSomethingToBuild, listNames, prepareHex, projectClause } from '../commands/prepare';
 import { saveHex } from '../commands/saveHex';
-import { PRODUCT, SECTION, SETTINGS, settingId } from '../config';
-import { findBoards, type Board } from '../drive/volume';
+import { PRODUCT } from '../config';
+import { boardAt, findBoards, type Board } from '../drive/volume';
 import { hexFilename } from '../filename';
 import { log } from '../log';
 import { createDriveIo, machine } from './io';
@@ -37,12 +37,11 @@ async function copyToDrive(context: vscode.ExtensionContext): Promise<void> {
 	// Before searching, or a workspace with nothing in it costs a prompt.
 	if (!hasSomethingToBuild()) return;
 
-	const where = configuredPath();
-	const search = await attachedBoards(where);
-	if (search.boards.length === 0) return offerToSave(context, where, search.searched);
-	const boards = search.boards;
+	const { boards, searched } = await attachedBoards();
+	if (boards.length === 0) return offerToSave(context, searched);
 
-	// Two boards on a machine is a classroom, not an edge case. One is not a question.
+	// Two boards on a machine is a classroom, not an edge case, and the choice is
+	// asked every time: flashing each of them in turn is the reason there are two.
 	const board = boards.length === 1 ? boards[0] : await pick(boards);
 	if (!board) return;
 
@@ -75,10 +74,9 @@ async function copyToDrive(context: vscode.ExtensionContext): Promise<void> {
  * write is flushed, so a failure with the board already gone may have worked.
  */
 async function explainFailedFlash(board: Board): Promise<string> {
-	// This board's own path, never a fresh search: discovery would ignore a
-	// configured mount point and, on Windows, wait out the query all over again.
-	const attached = await findBoards(driveIo, machine(), board.path)
-		.then((boards) => boards.length > 0)
+	// This board's own path, never a fresh search, which on Windows would wait out the whole query again.
+	const attached = await boardAt(driveIo, machine(), board.path)
+		.then((found) => found !== undefined)
 		.catch(() => true);
 
 	return attached
@@ -93,9 +91,9 @@ interface Search {
 	searched: boolean;
 }
 
-async function attachedBoards(configured: string): Promise<Search> {
+async function attachedBoards(): Promise<Search> {
 	try {
-		const boards = await findBoards(driveIo, machine(), configured || undefined);
+		const boards = await findBoards(driveIo, machine());
 		log(`Found ${boards.length} micro:bit drive(s)${boards.length ? `: ${describe(boards)}` : ''}`);
 		return { boards, searched: true };
 	} catch (error) {
@@ -103,9 +101,6 @@ async function attachedBoards(configured: string): Promise<Search> {
 		return { boards: [], searched: false };
 	}
 }
-
-const configuredPath = () =>
-	vscode.workspace.getConfiguration(SECTION).get<string>(SETTINGS.drivePath)?.trim() ?? '';
 
 const describe = (boards: readonly Board[]) =>
 	boards.map((board) => `${board.path} (${board.version ?? 'unknown version'})`).join(', ');
@@ -123,25 +118,17 @@ async function pick(boards: readonly Board[]): Promise<Board | undefined> {
 	return picked?.board;
 }
 
-/** Three reasons, one way out. Here it really is a file the user handles by hand. */
-async function offerToSave(context: vscode.ExtensionContext, configured: string, searched: boolean): Promise<void> {
+/** Two reasons, one way out. Here it really is a file the user handles by hand. */
+async function offerToSave(context: vscode.ExtensionContext, searched: boolean): Promise<void> {
+	// Naming no cause on purpose: the check can fail from a policy that will never
+	// allow it and from a machine that was merely slow, and they read the same here.
+	const why = searched
+		? 'no micro:bit found. Plug one in and give it a moment to be ready.'
+		: 'could not check which drives are removable, so there was nowhere to look for a micro:bit. Try again.';
+
 	const answer = await vscode.window.showWarningMessage(
-		`${PRODUCT}: ${whyNoBoard(configured, searched)} Or save your program as a file and copy it across yourself.`,
+		`${PRODUCT}: ${why} Or save your program as a file and copy it across yourself.`,
 		SAVE_HEX
 	);
 	if (answer === SAVE_HEX) await saveHex(context);
-}
-
-function whyNoBoard(configured: string, searched: boolean): string {
-	const setting = settingId(SETTINGS.drivePath);
-	if (configured) {
-		return `there is no micro:bit at ${configured}, which is where ${setting} says to look. Correct that setting, or empty it to search.`;
-	}
-
-	// Plugging a board in will not fix this, so it must not read as a missing board.
-	if (!searched) {
-		return `this computer would not say which of its drives are removable, so there is nowhere to look for a micro:bit. Set ${setting} to where it is mounted.`;
-	}
-
-	return 'no micro:bit found. Plug one in and give it a moment to be ready.';
 }

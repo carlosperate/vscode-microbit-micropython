@@ -45,7 +45,7 @@ export function activateHost(context: vscode.ExtensionContext, host: Host): Exte
 	for (const id of Object.values(COMMANDS)) {
 		const implementation = implemented[id];
 		context.subscriptions.push(
-			// Context-menu commands need the clicked resource forwarded intact.
+			// Whatever a caller passes is forwarded intact, rather than dropped here.
 			vscode.commands.registerCommand(id, async (...args: unknown[]) => {
 				log(`Running ${id}`);
 				try {

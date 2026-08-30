@@ -24,7 +24,6 @@ export const SECTION = 'microbit-micropython';
 export const SETTINGS = {
 	filesExclude: 'files.exclude',
 	projectFolder: 'projectFolder',
-	drivePath: 'drivePath',
 } as const;
 
 /** A setting as a user reads it in their own JSON, which is where they fix it. */
