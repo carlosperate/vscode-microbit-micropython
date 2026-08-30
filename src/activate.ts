@@ -1,40 +1,49 @@
+/**
+ * Everything both entry points do the same way. The two hosts reach a board by
+ * unrelated means, so the commands are the seam and everything else sits above.
+ */
 import * as vscode from 'vscode';
 
-import { connect, disconnect } from './commands/board';
-import { flash } from './commands/flash';
-import { openTerminal } from './commands/openTerminal';
-import { saveHex } from './commands/saveHex';
-import { selectProjectFolder } from './commands/selectProjectFolder';
 import { showMenu } from './commands/showMenu';
 import { COMMANDS, PRODUCT, type CommandId } from './config';
 import { createLog, log } from './log';
 import { createSerialMonitor } from './serial/eclipse';
-import { createBoard, shutdownBoard } from './usb/connection';
 
-/** Implemented commands, keyed by the typed ids also registered below. */
-const IMPLEMENTED: Partial<
-	Record<CommandId, (context: vscode.ExtensionContext, ...args: unknown[]) => Promise<void>>
-> = {
-	[COMMANDS.flash]: flash,
-	[COMMANDS.saveHex]: saveHex,
-	[COMMANDS.selectProjectFolder]: selectProjectFolder,
-	[COMMANDS.connect]: connect,
-	[COMMANDS.disconnect]: disconnect,
-	[COMMANDS.openTerminal]: openTerminal,
-	[COMMANDS.showMenu]: showMenu,
-};
+export type CommandHandler = (context: vscode.ExtensionContext, ...args: unknown[]) => Promise<void>;
 
-export function activate(context: vscode.ExtensionContext): void {
+/** Which entry point ran. Handed back from `activate` because nothing else can see it. */
+export interface ExtensionApi {
+	entry: Entry;
+}
+
+export type Entry = 'browser' | 'node';
+
+/** What one entry point supplies, over the shared wiring below. */
+export interface Host {
+	entry: Entry;
+	commands: Partial<Record<CommandId, CommandHandler>>;
+	/** Runs once the output channel exists. */
+	start(context: vscode.ExtensionContext): void;
+	/** Absent where nothing can be paired, which drops both menu entries. */
+	boardAttached?(): boolean;
+}
+
+export function activateHost(context: vscode.ExtensionContext, host: Host): ExtensionApi {
 	createLog(context);
-	log('Extension activated');
+	log(`Extension activated, ${host.entry} entry`);
 
 	createSerialMonitor(context);
-	createBoard(context);
+	host.start(context);
+
+	const implemented: Partial<Record<CommandId, CommandHandler>> = {
+		...host.commands,
+		[COMMANDS.showMenu]: (forMenu) => showMenu(forMenu, host.boardAttached?.()),
+	};
 
 	// Manifest titles keep stub notifications in sync with the command palette.
 	const titles = contributedTitles(context);
 	for (const id of Object.values(COMMANDS)) {
-		const implementation = IMPLEMENTED[id];
+		const implementation = implemented[id];
 		context.subscriptions.push(
 			// Context-menu commands need the clicked resource forwarded intact.
 			vscode.commands.registerCommand(id, async (...args: unknown[]) => {
@@ -52,15 +61,8 @@ export function activate(context: vscode.ExtensionContext): void {
 			})
 		);
 	}
-}
 
-/**
- * Awaited by VS Code, which is why the board is handed back here rather than
- * from a subscription: `dispose()` is synchronous and cannot see an asynchronous
- * disconnect through before the worker goes away.
- */
-export function deactivate(): Promise<void> {
-	return shutdownBoard();
+	return { entry: host.entry };
 }
 
 function contributedTitles(context: vscode.ExtensionContext): Map<string, string> {

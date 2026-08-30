@@ -6,7 +6,7 @@ import { hexFilename } from '../../src/filename';
 import { chooseWorkspaceFolder, resolveProject, selectWorkspaceFiles } from '../../src/files/workspace';
 import { readFirmware } from '../../src/hex/assets';
 import { buildFs, generateHex } from '../../src/hex/build';
-import { connectToBoard } from '../../src/usb/connect';
+import { connectToBoard, type UsbIdentity } from '../../src/usb/connect';
 
 /**
  * The integration tests: the same bundle run on two hosts, `@vscode/test-web` in
@@ -48,6 +48,10 @@ export async function run(): Promise<void> {
 	}
 
 	await checkActivation(extension);
+	await checkTheHostLoadedItsOwnEntry(extension);
+	await checkBothEntriesShip(extension);
+	checkItRunsBesideTheHardware(extension);
+	checkAMountPointJoinsToAFile();
 	await checkContributedCommandsResolve(extension);
 	await checkSerialMonitorCompanion();
 	await checkSelectionOnTheRealWorkspace();
@@ -359,6 +363,80 @@ async function checkActivation(extension: vscode.Extension<unknown>): Promise<vo
 }
 
 /**
+ * Which entry point ran. There are two, one per host, and the choice between
+ * them is the editor's: an extension declaring both `main` and `browser` gets
+ * `main` in a Node host and `browser` in a Web Worker one.
+ *
+ * Nothing else can see which arrived. A wrong answer means one host is running
+ * code written for the other, and the first sign of it is a command failing at
+ * a `navigator` or an `fs` that is not there.
+ */
+async function checkTheHostLoadedItsOwnEntry(extension: vscode.Extension<unknown>): Promise<void> {
+	// `activate()` hands back the cached exports, so this costs nothing.
+	const api = (await extension.activate()) as { entry?: unknown } | undefined;
+	const expected = vscode.env.uiKind === vscode.UIKind.Desktop ? 'node' : 'browser';
+	record(
+		'the host loads the entry point written for it',
+		api?.entry === expected,
+		`uiKind=${expected === 'node' ? 'Desktop' : 'Web'}, entry=${JSON.stringify(api?.entry)}, expected ${expected}`
+	);
+}
+
+/**
+ * One VSIX carries both entry points, which is only true if both were built. A
+ * missing one leaves that host loading nothing, with no error anywhere: the
+ * extension is listed, activates, and contributes not one command.
+ */
+async function checkBothEntriesShip(extension: vscode.Extension<unknown>): Promise<void> {
+	for (const field of ['browser', 'main']) {
+		const declared: unknown = extension.packageJSON?.[field];
+		if (typeof declared !== 'string') {
+			record(`the manifest declares ${field}`, false, `${field}=${JSON.stringify(declared)}`);
+			continue;
+		}
+
+		const target = vscode.Uri.joinPath(extension.extensionUri, ...declared.replace(/^\.\//, '').split('/'));
+		record(`the ${field} entry is where the manifest says`, await exists(target), `${declared} -> ${target}`);
+	}
+}
+
+/**
+ * Where a desktop flash writes. The drive search hands back a mount point, a
+ * bare drive letter on Windows and a path everywhere else, and joining a
+ * filename onto it has to produce something the filesystem accepts. The drive
+ * letter is the one that can surprise, and only a real host has `Uri` to try it.
+ */
+function checkAMountPointJoinsToAFile(): void {
+	if (vscode.env.uiKind !== vscode.UIKind.Desktop) return;
+
+	const windows = process.platform === 'win32';
+	const mount = windows ? 'E:' : '/Volumes/MICROBIT';
+	const joined = vscode.Uri.joinPath(vscode.Uri.file(mount), 'workspace.hex');
+	const wanted = windows ? /^[A-Za-z]:\\workspace\.hex$/ : /^\/Volumes\/MICROBIT\/workspace\.hex$/;
+
+	record('a mount point joins to a file path', wanted.test(joined.fsPath), `${mount} -> ${joined.fsPath}`);
+}
+
+/**
+ * Where the extension runs, which having a `main` at all put in question: the
+ * default for one is the **workspace**, so in a Remote-SSH, WSL, container or
+ * Codespaces window it would run on the remote and go looking for a mounted
+ * board on a machine the user has never plugged one into. `ui` keeps it beside
+ * the hardware, and beside the serial companion it hands every terminal to,
+ * which declares the same.
+ *
+ * Read back from the host rather than from the manifest, so this is the kind
+ * that was actually resolved and not a second copy of what we asked for.
+ */
+function checkItRunsBesideTheHardware(extension: vscode.Extension<unknown>): void {
+	record(
+		'the extension runs on the machine the board is plugged into',
+		extension.extensionKind === vscode.ExtensionKind.UI,
+		`extensionKind=${vscode.ExtensionKind[extension.extensionKind] ?? extension.extensionKind}`
+	);
+}
+
+/**
  * The manifest and the registrations live in different files, so they drift
  * silently: the palette lists a contributed command whatever happens, and only
  * running it reveals there is no handler. Read the ids from the manifest at
@@ -433,9 +511,9 @@ async function waitForCommand(command: string): Promise<boolean> {
  * A failure here would say nothing about our code.
  */
 async function reportWebUsb(): Promise<void> {
-	const usb = (navigator as Navigator & { usb?: { getDevices(): Promise<unknown[]> } }).usb;
+	const usb = webUsb();
 	if (!usb) {
-		record('WebUSB in the extension host', true, 'navigator.usb is absent');
+		record('WebUSB in the extension host', true, `navigator.usb is absent${hasNavigator() ? '' : ', with no navigator'}`);
 		return;
 	}
 
@@ -444,6 +522,22 @@ async function reportWebUsb(): Promise<void> {
 		record('WebUSB in the extension host', true, `navigator.usb present, ${devices.length} already authorised`);
 	} catch (error) {
 		record('WebUSB in the extension host', true, `navigator.usb present, getDevices() threw: ${String(error)}`);
+	}
+}
+
+/**
+ * `navigator` is a browser global and the Node extension host has none, so
+ * reading through it is a `ReferenceError` there rather than an absent WebUSB.
+ * The `try` is for the other end of the same question: a privacy extension can
+ * replace the property with a getter that throws.
+ */
+const hasNavigator = () => typeof navigator !== 'undefined';
+
+function webUsb(): { getDevices(): Promise<unknown[]> } | undefined {
+	try {
+		return hasNavigator() ? (navigator as Navigator & { usb?: { getDevices(): Promise<unknown[]> } }).usb : undefined;
+	} catch {
+		return undefined;
 	}
 }
 
@@ -481,10 +575,11 @@ async function checkTheChooserIsNeverReached(bridged: boolean): Promise<void> {
 	const name = 'no board means no connection attempt';
 	let connected = false;
 	let asked = false;
+	const usb = webUsb();
 
 	try {
 		const outcome = await connectToBoard({
-			authorised: async () => (navigator.usb ? await navigator.usb.getDevices() : []),
+			authorised: async () => ((await usb?.getDevices()) ?? []) as UsbIdentity[],
 			canPair: () => bridged,
 			// Stubbed, and only here: the real bridge opens a chooser nothing in a
 			// headless run can answer.
@@ -527,6 +622,12 @@ async function checkTheChooserIsNeverReached(bridged: boolean): Promise<void> {
  */
 async function checkAHostileNavigatorIsSurvived(extension: vscode.Extension<unknown>): Promise<void> {
 	const name = 'a navigator.usb that throws is refused, not fatal';
+	// The Node host has no navigator at all, and nothing there reads WebUSB.
+	if (!hasNavigator()) {
+		console.log('[test] SKIP  this host has no navigator to make hostile');
+		return;
+	}
+
 	const original = Object.getOwnPropertyDescriptor(navigator, 'usb');
 	try {
 		Object.defineProperty(navigator, 'usb', {

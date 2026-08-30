@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 
-import { PRODUCT, SERIAL_MONITOR_EXTENSION } from '../config';
+import { PRODUCT } from '../config';
 import { log } from '../log';
-import { openEclipseSerial, openNativeSerial, SerialMonitorError } from '../serial/eclipse';
+import { openEclipseSerial, openNativeSerial } from '../serial/eclipse';
+import { reportSerialFailure } from '../serial/failure';
 import { openSerialRoute } from '../serial/route';
 import { SERIAL_BAUD_RATE, WebUsbSerialPort } from '../serial/webusb-port';
 import { connectBoard, getSerialTransport, REQUEST_USB_DEVICE, usbAvailable } from '../usb/connection';
@@ -10,7 +11,6 @@ import { MICROBIT_FILTER } from '../usb/connect';
 
 const REQUEST_SERIAL_PORT = 'workbench.experimental.requestSerialPort';
 const USE_WEB_SERIAL = 'Use Web Serial';
-const SHOW_EXTENSION = 'Show Serial Monitor Extension';
 
 export async function openTerminal(): Promise<void> {
 	try {
@@ -35,16 +35,7 @@ export async function openTerminal(): Promise<void> {
 			},
 		});
 	} catch (error) {
-		log(`The serial terminal could not be opened: ${String(error)}`);
-		const message = error instanceof Error ? error.message : String(error);
-		if (error instanceof SerialMonitorError) {
-			const action = await vscode.window.showErrorMessage(`${PRODUCT}: ${message}`, SHOW_EXTENSION);
-			if (action === SHOW_EXTENSION) {
-				await vscode.commands.executeCommand('workbench.extensions.search', `@id:${SERIAL_MONITOR_EXTENSION}`);
-			}
-			return;
-		}
-		void vscode.window.showErrorMessage(`${PRODUCT}: the serial terminal could not be opened. ${message}`);
+		await reportSerialFailure(error);
 	}
 }
 

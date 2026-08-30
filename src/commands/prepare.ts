@@ -30,6 +30,15 @@ export function hasSomethingToBuild(): boolean {
 /** Omits the common workspace-root case from notifications. */
 export const projectClause = (prepared: Prepared) => (prepared.project ? ` in ${prepared.project}/` : '');
 
+/** Long projects would otherwise turn the success toast into a wall of filenames. */
+const NAMES_SHOWN = 6;
+
+export function listNames(files: readonly { name: string }[]): string {
+	const names = files.map((file) => file.name);
+	if (names.length <= NAMES_SHOWN) return names.join(', ');
+	return `${names.slice(0, NAMES_SHOWN).join(', ')}, and ${names.length - NAMES_SHOWN} more`;
+}
+
 /**
  * Shared preparation for Flash and Save Hex: resolve, select, and build.
  *
@@ -164,5 +173,5 @@ function warnAboutOmissions(context: vscode.ExtensionContext, project: vscode.Ur
 	if (omitted.length === 0) return;
 
 	const folders = selection.folders.length ? ' The micro:bit filesystem has no folders.' : '';
-	void vscode.window.showWarningMessage(`${PRODUCT}: not copied to the board: ${omitted.join(', ')}.${folders}`);
+	void vscode.window.showWarningMessage(`${PRODUCT}: left off the micro:bit: ${omitted.join(', ')}.${folders}`);
 }

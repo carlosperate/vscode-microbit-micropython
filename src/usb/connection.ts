@@ -16,7 +16,7 @@ import {
 } from '@microbit/microbit-connection/usb';
 import * as vscode from 'vscode';
 
-import { PRODUCT } from '../config';
+import { CAN_PAIR_CONTEXT, PRODUCT } from '../config';
 import { log } from '../log';
 import { SerialWriteGate } from '../serial/transport';
 import type { SerialTransport } from '../serial/types';
@@ -172,6 +172,10 @@ export function createBoard(context: vscode.ExtensionContext): void {
 	void vscode.commands.getCommands(true).then(
 		(registered) => {
 			bridged = registered.includes(REQUEST_USB_DEVICE);
+			// Hides Connect and Disconnect from the palette; set only here, so it is the probe's answer.
+			void vscode.commands.executeCommand('setContext', CAN_PAIR_CONTEXT, bridged).then(undefined, (error: unknown) =>
+				log(`Could not say whether this host can pair: ${describeError(error)}`)
+			);
 			log(bridged ? 'This host can pair a micro:bit' : 'This host can only use a micro:bit something else authorised');
 		},
 		(error: unknown) => log(`Could not tell whether this host can pair a micro:bit: ${describeError(error)}`)

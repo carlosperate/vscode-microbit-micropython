@@ -10,9 +10,10 @@
  * directory of their own, so a session is isolated from the machine's own
  * install and no settings of the developer's are read.
  *
- * `--extensionDevelopmentKind=web` is deliberately not passed. With no `main`
- * entry the manifest already puts this in the LocalWebWorker host, so leaving
- * the flag off tests what a real desktop install gets.
+ * `--extensionDevelopmentKind` is deliberately not passed. The manifest declares
+ * both `main` and `browser`, so desktop picks `main` and runs this in the Node
+ * host, which is what a real desktop install gets. Forcing the web kind here
+ * would test a bundle no desktop user ever loads.
  */
 import { downloadAndUnzipVSCode, runTests } from '@vscode/test-electron';
 import { spawn } from 'node:child_process';
@@ -28,6 +29,11 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
 const bench = path.join(root, 'test', 'workspace');
 const testing = process.argv.includes('--test');
+// `engines.vscode` is the floor, and its node is far older than the @types/node
+// this compiles against, so a node API newer than it compiles and then throws.
+// Only running there catches that: `--vscode-version=1.91.1`.
+const versionArgument = process.argv.find((argument) => argument.startsWith('--vscode-version='));
+const version = versionArgument?.slice('--vscode-version='.length);
 const serialMonitorArgument = process.argv.find((argument) => argument.startsWith('--serial-monitor-path='));
 const serialMonitorPath = serialMonitorArgument?.slice('--serial-monitor-path='.length);
 const developmentPaths = serialMonitorPath ? [root, path.resolve(serialMonitorPath)] : [root];
@@ -138,12 +144,14 @@ const launchArgs = [
 ];
 
 if (testing) {
-	// The integration tests' own bundle, unchanged. It is built for the browser
-	// and that is right here too: for an extension with no `main`, a script loaded
-	// through `--extensionTestsPath` runs in the **web worker** host on desktop as
-	// well, so one bundle serves both runs.
+	// The integration tests' own bundle, unchanged. A script loaded through
+	// `--extensionTestsPath` runs in whichever host the extension itself uses, so
+	// this one is required by node here and loaded by a worker on the web. It
+	// stays a browser build because nothing in it needs a node builtin, and it
+	// reads `navigator` only behind a guard, which node has no equivalent of.
 	try {
 		await runTests({
+			...(version ? { version } : {}),
 			extensionDevelopmentPath: developmentPaths,
 			extensionTestsPath: path.join(root, 'test', 'integration', 'dist', 'index.js'),
 			extensionTestsEnv: clearedVscodeVars(),
@@ -160,7 +168,7 @@ if (testing) {
 		fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 	}
 } else {
-	const executable = await downloadAndUnzipVSCode();
+	const executable = await downloadAndUnzipVSCode(version);
 	const args = [
 		// Absolute: VS Code resolves a relative path here against its own cwd, not
 		// the shell's, and then quietly opens a window with no extension in it.

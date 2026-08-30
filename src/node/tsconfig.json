@@ -1,0 +1,22 @@
+{
+	// The desktop entry really does run in node, so this is the one part of `src/`
+	// that gets node's types. The root project excludes this folder: everywhere
+	// else they would let `process`, `Buffer` and `__dirname` compile and then
+	// throw in the Web Worker.
+	//
+	// It sits here rather than at the repo root so an editor picks it up too:
+	// tsserver uses the nearest tsconfig above the file it is checking.
+	// `@types/node` here is far newer than the node `engines.vscode` runs on, so a
+	// node API added after that floor compiles clean and throws on the oldest
+	// supported editor. Nothing catches it but running there:
+	// `npm run test:integration:desktop -- --vscode-version=1.91.1`.
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"lib": ["ES2020"],
+		"types": ["vscode", "node", "w3c-web-serial", "w3c-web-usb"]
+	},
+	// The root's `exclude` is this very folder, and it is inherited, so it has to
+	// be replaced rather than extended.
+	"exclude": ["../../node_modules", "../../dist"],
+	"include": ["**/*.ts"]
+}

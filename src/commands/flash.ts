@@ -11,7 +11,7 @@ import {
 	flashBoard,
 	withSerialWritesBlocked,
 } from '../usb/connection';
-import { hasSomethingToBuild, prepareHex, projectClause } from './prepare';
+import { hasSomethingToBuild, listNames, prepareHex, projectClause } from './prepare';
 
 /**
  * One flash at a time. Set before the first await, because two writers on one
@@ -79,18 +79,9 @@ async function copyToBoard(context: vscode.ExtensionContext): Promise<void> {
 
 	log(`Flashed ${prepared.files.length} file(s) to a micro:bit ${version}`);
 	void vscode.window.showInformationMessage(
-		`${PRODUCT}: copied ${prepared.files.length} file(s)${projectClause(prepared)} to the micro:bit, ` +
+		`${PRODUCT}: flashing ${prepared.files.length} file(s)${projectClause(prepared)} to the micro:bit, ` +
 			`${listNames(prepared.files)}.`
 	);
-}
-
-/** Long projects would otherwise turn the success toast into a wall of filenames. */
-const NAMES_SHOWN = 6;
-
-function listNames(files: readonly { name: string }[]): string {
-	const names = files.map((file) => file.name);
-	if (names.length <= NAMES_SHOWN) return names.join(', ');
-	return `${names.slice(0, NAMES_SHOWN).join(', ')}, and ${names.length - NAMES_SHOWN} more`;
 }
 
 /** `flashBoard` already confirmed the board before this runs, so it never refuses. */

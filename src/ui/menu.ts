@@ -31,17 +31,22 @@ export const menuOrder = (connected: boolean): readonly string[] =>
  * that cannot use it is answered with a message when it runs, not by hiding
  * the entry, which only leaves someone wondering where the rest went.
  */
-export function menuCommands(contributed: readonly Contributed[], connected: boolean): Contributed[] {
-	const order = menuOrder(connected);
+export function menuCommands(contributed: readonly Contributed[], connected: boolean | undefined): Contributed[] {
+	const order = menuOrder(connected ?? false);
 	// `filter` already answers with a new array, so the sort is not the caller's.
 	return contributed
 		.filter((entry) => allowed(entry.command, connected))
 		.sort((a, b) => place(order, a.command) - place(order, b.command));
 }
 
-function allowed(command: string, connected: boolean): boolean {
-	if (command === COMMANDS.connect) return !connected;
-	if (command === COMMANDS.disconnect) return connected;
+/**
+ * An unknown `connected` is a host with no way to authorise a board at all, so
+ * neither entry describes anything it can do and both go. Every other command
+ * stays, because the board is not what they are for.
+ */
+function allowed(command: string, connected: boolean | undefined): boolean {
+	if (command === COMMANDS.connect) return connected === false;
+	if (command === COMMANDS.disconnect) return connected === true;
 	return true;
 }
 

@@ -1,14 +1,14 @@
 {
   "name": "microbit-micropython",
   "displayName": "BBC micro:bit MicroPython",
-  "description": "Build and flash a MicroPython project to a BBC micro:bit over WebUSB, with a serial REPL.",
+  "description": "Build and flash a MicroPython project to a BBC micro:bit, with a serial REPL.",
   "version": "0.1.0",
   "publisher": "carlosperate",
   "license": "MIT",
   "scripts": {
     "build": "node config/esbuild.config.mjs",
     "build:integration": "esbuild test/integration/index.ts --bundle --outfile=test/integration/dist/index.js --format=cjs --platform=browser --main-fields=module,browser,main --external:vscode --log-level=warning",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p test",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/node && tsc --noEmit -p test",
     "test": "vitest run --config config/vitest.config.mts",
     "test:watch": "vitest --config config/vitest.config.mts",
     "test:integration": "npm run build && npm run build:integration && vscode-test-web --quality stable --headless --extensionDevelopmentPath=. --extensionTestsPath=./test/integration/dist/index.js ./test/workspace",
@@ -35,7 +35,11 @@
   "engines": {
     "vscode": "^1.91.0"
   },
-  "browser": "./dist/extension.js",
+  "browser": "./dist/browser.js",
+  "main": "./dist/node.js",
+  "extensionKind": [
+    "ui"
+  ],
   "extensionPack": [
     "eclipse-cdt.serial-monitor"
   ],
@@ -70,6 +74,12 @@
           "default": "",
           "scope": "resource",
           "markdownDescription": "The folder holding the micro:bit code, relative to this workspace folder, for example `src`. Empty means the workspace folder itself. Only the files directly inside it go on the micro:bit."
+        },
+        "microbit-micropython.drivePath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "Where the micro:bit is mounted, for example `E:` or `/media/me/MICROBIT`. Empty means find it automatically, which is what almost everyone wants. Set it where the automatic search cannot run: on Windows that is a computer whose policy stops this extension asking which of its drives are removable."
         },
         "microbit-micropython.files.exclude": {
           "type": "array",
@@ -115,6 +125,16 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "microbit-micropython.connect",
+          "when": "microbit-micropython.canPair"
+        },
+        {
+          "command": "microbit-micropython.disconnect",
+          "when": "microbit-micropython.canPair"
+        }
+      ],
       "explorer/context": [
         {
           "command": "microbit-micropython.selectProjectFolder",

@@ -133,7 +133,8 @@ describe('the status bar menu', () => {
 		{ command: COMMANDS.openTerminal, title: 'Open Serial Terminal' },
 	];
 
-	const titles = (connected: boolean) => menuCommands(contributed, connected).map((entry) => entry.title);
+	const titles = (connected: boolean | undefined) =>
+		menuCommands(contributed, connected).map((entry) => entry.title);
 
 	/** Nothing below it works until it has been done, so it leads. */
 	it('puts Connect first while there is no board', () => {
@@ -143,6 +144,15 @@ describe('the status bar menu', () => {
 	/** It undoes the menu rather than using it, so it trails. */
 	it('puts Disconnect last once there is one', () => {
 		expect(titles(true)).toEqual(['Flash', 'Open Serial Terminal', 'Save Hex', 'Select Project Folder', 'Disconnect']);
+	});
+
+	/**
+	 * Desktop VS Code registers nothing that can authorise a USB device, so
+	 * neither entry describes anything it can do. Offering Connect there is a
+	 * button whose only outcome is an explanation of why it does nothing.
+	 */
+	it('offers neither where no board can be paired', () => {
+		expect(titles(undefined)).toEqual(['Flash', 'Open Serial Terminal', 'Save Hex', 'Select Project Folder']);
 	});
 
 	/**

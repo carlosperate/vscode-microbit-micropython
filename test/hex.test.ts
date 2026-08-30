@@ -245,6 +245,12 @@ describe('the size of the device filesystem', () => {
 		[1500, 'milliseconds spent waiting for the USB bus to settle after a board disappears'],
 		[2000, 'milliseconds a hold waits for terminal input already accepted to reach the board'],
 		[115200, "the micro:bit's serial baud rate"],
+		[10_000, 'milliseconds Windows is given to answer with the names of its removable volumes'],
+		// The board ids DAPLink writes into DETAILS.TXT, which are four hex digits
+		// that happen to read as large decimals rather than a size of anything.
+		...[9900, 9901, 9903, 9904, 9905, 9906].map(
+			(id) => [id, 'a micro:bit board id, as it appears in DETAILS.TXT'] as [number, string]
+		),
 	]);
 
 	/** Device figures start at one filesystem chunk and run to whole flash pages. */
