@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { COMMANDS, PRODUCT } from '../src/config';
 import { describeError, explainDevice } from '../src/ui/errors';
 import { menuCommands, menuOrder } from '../src/ui/menu';
-import { describeStatus } from '../src/ui/status';
+import { createVisibleStatus, describeStatus } from '../src/ui/status';
 
 describe('what the status bar says', () => {
 	it('has an answer for every status the library can report', () => {
@@ -45,6 +45,16 @@ describe('what the status bar says', () => {
 	it('drops it again once the board is gone', () => {
 		expect(describeStatus(ConnectionStatus.Disconnected, 'V2').text).toBe('$(debug-disconnect) micro:bit');
 		expect(describeStatus(ConnectionStatus.NoAuthorizedDevice, 'V2').text).toBe('$(plug) micro:bit');
+	});
+
+	it('uses the disconnected icon only after a board has been live', () => {
+		const visibleStatus = createVisibleStatus();
+		expect(visibleStatus(ConnectionStatus.NoAuthorizedDevice)).toBe(ConnectionStatus.NoAuthorizedDevice);
+		expect(visibleStatus(ConnectionStatus.Connecting)).toBe(ConnectionStatus.Connecting);
+		expect(visibleStatus(ConnectionStatus.Connected)).toBe(ConnectionStatus.Connected);
+		expect(visibleStatus(ConnectionStatus.NoAuthorizedDevice)).toBe(ConnectionStatus.Disconnected);
+		expect(visibleStatus(ConnectionStatus.Connecting)).toBe(ConnectionStatus.Connecting);
+		expect(visibleStatus(ConnectionStatus.NoAuthorizedDevice)).toBe(ConnectionStatus.Disconnected);
 	});
 
 	/** Connecting is the only status anything is still happening in. */

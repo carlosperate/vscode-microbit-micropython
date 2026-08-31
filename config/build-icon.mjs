@@ -5,7 +5,7 @@ import path from 'node:path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const assetsPath = path.join(__dirname, '..', 'assets');
-const svgPath = path.join(__dirname, 'icon.svg');
+const svgPath = path.join(assetsPath, 'icon.svg');
 const pngPath = path.join(assetsPath, 'icon.png');
 
 // VS Code recommends a 256x256 extension icon for Retina displays.

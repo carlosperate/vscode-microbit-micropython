@@ -5,21 +5,33 @@ the device serial and REPL 🐍🤖.
 
 Works on both desktop and web versions of VS Code and compatible editors.
 
-🚧 This extension is still under construction. Most features are implemented
-and should be usable, if you find any issues please raise a bug,
-it'll be very appreciated!
+🚧 Extension still under construction. Most features are implemented and should
+be usable, if you find any issues please raise a bug, it'll be very appreciated!
 https://github.com/carlosperate/vscode-microbit-micropython/issues
+
+## How to use it
+
+1. Write your code in `main.py` (or any file in your project folder).
+2. Plug in your micro:bit with a USB cable.
+3. Click the micro:bit icon at the bottom of the window, a new menu appears at
+  the top, and choose **Flash**.
+4. Using non-Chromium browsers? Choose **Save Hex** instead, then drag the saved
+  file onto the `MICROBIT` drive that appears when you plug in the board.
+5. To talk to the board, choose **Open Serial Terminal** from the same menu.
+  Press `Ctrl+C` to interrupt the running program and get a MicroPython prompt.
+
+![Extension screenshot](assets/screenshot.png)
 
 ## What it does
 
-- **Save Hex:** Builds a hex from your workspace and MicroPython, the same way
-  the micro:bit's online Python editor does, and saves it. You can copy this
-  file onto the `MICROBIT` drive to run your code.
-- **Direct Flash:** Send the built MicroPython hex to a connected micro:bit. In a
-  Chromium based browser this goes over WebUSB, in desktop VS Code it uses
+- **Direct Flash:** Send the built MicroPython hex to a connected micro:bit.
+  In a Chromium based browser this goes over WebUSB, in desktop VS Code it uses
   the `MICROBIT` USB drive.
 - **Open Serial Terminal:** And access the MicroPython REPL from the board,
   inside a VS Code's terminal.
+- **Save Hex:** Builds a hex from your workspace and MicroPython, the same way
+  the micro:bit's online Python editor does, and saves it. You can copy this
+  file onto the `MICROBIT` drive to run your code.
 
 ## Your project folder
 
@@ -37,19 +49,8 @@ subfolder, run the **Select Project Folder** command to select it.
 |---|---|---|---|
 | Desktop VS Code | ✅ copies to the `MICROBIT` drive | ✅ native serial port | ✅ |
 | Chrome, Edge and other Chromium browsers | ✅ WebUSB | ✅ WebUSB | ✅ |
-| Firefox 151+ (desktop) | ❌ no WebUSB, use Save Hex | ✅ Web Serial | ✅ |
+| Firefox 151+ (desktop) | ❌ no WebUSB, use Save Hex | ❓ Web Serial (theoretically, known issue present) | ✅ |
 | Safari | ❌ no WebUSB, use Save Hex | ❌ no WebUSB or Web Serial | ✅ |
-
-## How to use it
-
-1. Write your code in `main.py` (or any file in your project folder).
-2. Plug in your micro:bit with a USB cable.
-3. Click the micro:bit icon at the bottom of the window, a new menu appears at
-  the top, and choose **Flash**.
-4. Using non-Chromium browsers? Choose **Save Hex** instead, then drag the saved
-  file onto the `MICROBIT` drive that appears when you plug in the board.
-5. To talk to the board, choose **Open Serial Terminal** from the same menu.
-  Press `Ctrl+C` to interrupt the running program and get a MicroPython prompt.
 
 ## Requirements
 

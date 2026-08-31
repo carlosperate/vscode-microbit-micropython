@@ -32,6 +32,15 @@ const DISPLAY: Record<ConnectionStatus, { icon: string; named: boolean; tooltip:
 	Paused: { icon: 'debug-pause', named: true, tooltip: (board) => `${board} paused` },
 };
 
+/** Keeps the neutral startup icon distinct from a board that has gone away. */
+export function createVisibleStatus(): (status: ConnectionStatus) => ConnectionStatus {
+	let wasLive = false;
+	return (status) => {
+		wasLive ||= status === ConnectionStatus.Connected || status === ConnectionStatus.Paused;
+		return status === ConnectionStatus.NoAuthorizedDevice && wasLive ? ConnectionStatus.Disconnected : status;
+	};
+}
+
 /**
  * There is no colour here on purpose: VS Code offers only `warningBackground`
  * and `errorBackground`, which shout across the whole item, and "no board yet"

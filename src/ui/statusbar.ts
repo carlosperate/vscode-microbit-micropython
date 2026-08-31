@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 
 import { COMMANDS, PRODUCT } from '../config';
 import { log } from '../log';
-import { describeStatus } from './status';
+import { createVisibleStatus, describeStatus } from './status';
 
 /** The always-visible entry point for connecting a board. */
 export interface StatusBar extends vscode.Disposable {
@@ -19,11 +19,12 @@ export function createStatusBar(): StatusBar {
 	const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
 	item.name = PRODUCT;
 	item.command = COMMANDS.showMenu;
+	const visibleStatus = createVisibleStatus();
 
 	// Logged here rather than beside the connection, so what a reader sees in the
 	// output channel is word for word what the tooltip beside them says.
 	const update = (status: ConnectionStatus, board?: BoardVersion) => {
-		const { text, tooltip, summary } = describeStatus(status, board);
+		const { text, tooltip, summary } = describeStatus(visibleStatus(status), board);
 		item.text = text;
 		item.tooltip = tooltip;
 		log(`Board status: ${summary}`);

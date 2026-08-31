@@ -63,6 +63,8 @@
   ],
   "keywords": [
     "microbit",
+    "bbcmicrobit",
+    "bbc-microbit",
     "micropython",
     "python",
     "webusb",
