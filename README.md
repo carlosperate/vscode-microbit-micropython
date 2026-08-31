@@ -72,3 +72,7 @@ The bundled MicroPython firmware images come from
 [bbcmicrobit/micropython](https://github.com/bbcmicrobit/micropython) (V1) and
 [microbit-foundation/micropython-microbit-v2](https://github.com/microbit-foundation/micropython-microbit-v2)
 (V2), both MIT licensed.
+
+The MicroPython logo used in the extension icon comes from the
+[MicroPython project](https://github.com/micropython/micropython) under the
+MIT License.

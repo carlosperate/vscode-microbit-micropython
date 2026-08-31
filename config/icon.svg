@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <title>MicroPython logo on a micro:bit board</title>
+  <!-- Blue background-->
+  <!-- <rect x="8" y="8" width="240" height="240" rx="52" fill="#2563eb"/> -->
+  <defs>
+    <path id="mp-m" fill-rule="evenodd" d="M0 0h69v69H0zM15 15h3v54h-3zM33 0h3v54h-3zM51 15h3v54h-3zM60 56h4v7h-4z"/>
+    <path id="board-shape" d="M43 38h170c14 0 25 11 25 25v132c0 16-13 29-29 29H47c-16 0-29-13-29-29V63c0-14 11-25 25-25z"/>
+  </defs>
+  <g transform="translate(0 2)">
+    <path d="M102 42V29c0-6 5-10 11-10h30c6 0 11 4 11 10v13" fill="#747b84" stroke="#3e444b" stroke-width="4"/>
+    <path d="M109 39V29c0-3 3-5 6-5h26c3 0 6 2 6 5v10" fill="#b9bec4"/>
+    <rect x="115" y="22" width="26" height="6" rx="2" fill="#454b52"/>
+  </g>
+  <use href="#board-shape" fill="#151719"/>
+  <path d="M21 64c0-13 10-23 23-23h36L21 100z" fill="#2f80ed"/>
+  <path d="M79 41h31L79 72z" fill="#2f80ed"/>
+  <g>
+    <rect x="38" y="110" width="34" height="34" rx="3" fill="#aeb4ba" stroke="#656b72" stroke-width="3"/>
+    <circle cx="55" cy="127" r="11" fill="#050607" stroke="#30343a" stroke-width="2"/>
+    <circle cx="26" cy="127" r="4" fill="#555a60"/>
+    <rect x="184" y="110" width="34" height="34" rx="3" fill="#aeb4ba" stroke="#656b72" stroke-width="3"/>
+    <circle cx="201" cy="127" r="11" fill="#050607" stroke="#30343a" stroke-width="2"/>
+    <circle cx="230" cy="127" r="4" fill="#555a60"/>
+  </g>
+  <use href="#mp-m" transform="translate(92 91) scale(1.05)" fill="#f8fafc"/>
+  <rect x="28" y="181" width="200" height="32" rx="10" fill="#f7c52b"/>
+  <g fill="#151719">
+    <circle cx="45" cy="197" r="9"/><circle cx="86" cy="197" r="9"/><circle cx="128" cy="197" r="9"/><circle cx="170" cy="197" r="9"/><circle cx="211" cy="197" r="9"/>
+  </g>
+  <use href="#board-shape" fill="none" stroke="#f8fafc" stroke-width="5"/>
+</svg>
