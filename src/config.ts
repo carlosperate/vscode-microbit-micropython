@@ -4,23 +4,23 @@
  * the micro:bit Foundation's `microbit.*` commands.
  */
 export const COMMANDS = {
-	flash: 'microbit-micropython.flash',
-	saveHex: 'microbit-micropython.saveHex',
-	selectProjectFolder: 'microbit-micropython.selectProjectFolder',
-	connect: 'microbit-micropython.connect',
-	disconnect: 'microbit-micropython.disconnect',
-	openTerminal: 'microbit-micropython.openTerminal',
+	flash: 'bbcmicrobit-micropython.flash',
+	saveHex: 'bbcmicrobit-micropython.saveHex',
+	selectProjectFolder: 'bbcmicrobit-micropython.selectProjectFolder',
+	connect: 'bbcmicrobit-micropython.connect',
+	disconnect: 'bbcmicrobit-micropython.disconnect',
+	openTerminal: 'bbcmicrobit-micropython.openTerminal',
 	/**
 	 * Registered, deliberately not contributed. It opens a menu of the palette's
 	 * own entries, so a palette entry for it would be noise.
 	 */
-	showMenu: 'microbit-micropython.showMenu',
+	showMenu: 'bbcmicrobit-micropython.showMenu',
 } as const;
 
 export type CommandId = (typeof COMMANDS)[keyof typeof COMMANDS];
 
 /** The settings section, and the keys inside it, as the manifest declares them. */
-export const SECTION = 'microbit-micropython';
+export const SECTION = 'bbcmicrobit-micropython';
 export const SETTINGS = {
 	filesExclude: 'files.exclude',
 	projectFolder: 'projectFolder',
@@ -44,4 +44,4 @@ export const SERIAL_MONITOR_EXTENSION = 'eclipse-cdt.serial-monitor';
  * A capability and not a host: a web workbench that stopped bridging the device
  * chooser would hide them too, which is the right answer there as well.
  */
-export const CAN_PAIR_CONTEXT = 'microbit-micropython.canPair';
+export const CAN_PAIR_CONTEXT = 'bbcmicrobit-micropython.canPair';

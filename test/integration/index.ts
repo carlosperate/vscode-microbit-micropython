@@ -17,7 +17,7 @@ import { connectToBoard, type UsbIdentity } from '../../src/usb/connect';
  * Every check reports before it asserts, so a failing run says which assumption
  * broke rather than stopping at the first one.
  */
-const EXTENSION_ID = 'carlosperate.microbit-micropython';
+const EXTENSION_ID = 'carlosperate.bbcmicrobit-micropython';
 
 interface Result {
 	name: string;

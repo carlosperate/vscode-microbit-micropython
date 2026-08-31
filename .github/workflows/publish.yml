@@ -53,17 +53,17 @@ jobs:
       - name: Integration tests, desktop VS Code
         run: xvfb-run -a npm run test:integration:desktop
 
-      # Version from package.json, on release the check above matches it to the tag.
+      # Name and version from package.json, on release the check above matches the version to the tag.
       - name: Package VSIX
         run: |
-          VSIX_NAME="microbit-micropython-$(node -p "require('./package.json').version").vsix"
+          VSIX_NAME="$(node -p "require('./package.json').name")-$(node -p "require('./package.json').version").vsix"
           npx --yes @vscode/vsce package --out "$VSIX_NAME"
           echo "VSIX_NAME=$VSIX_NAME" >> "$GITHUB_ENV"
 
       - name: Upload VSIX as workflow artifact
         uses: actions/upload-artifact@v7
         with:
-          name: microbit-micropython-vsix
+          name: bbcmicrobit-micropython-vsix
           path: "*.vsix"
           if-no-files-found: error
 

@@ -1,5 +1,5 @@
 {
-  "name": "microbit-micropython",
+  "name": "bbcmicrobit-micropython",
   "displayName": "BBC micro:bit MicroPython",
   "description": "Build and flash a MicroPython project to a BBC micro:bit, and connect to the device serial and REPL.",
   "version": "0.1.0",
@@ -75,13 +75,13 @@
     "configuration": {
       "title": "BBC micro:bit MicroPython",
       "properties": {
-        "microbit-micropython.projectFolder": {
+        "bbcmicrobit-micropython.projectFolder": {
           "type": "string",
           "default": "",
           "scope": "resource",
           "markdownDescription": "The folder holding the micro:bit code, relative to this workspace folder, for example `src`. Empty means the workspace folder itself. Only the files directly inside it go on the micro:bit."
         },
-        "microbit-micropython.files.exclude": {
+        "bbcmicrobit-micropython.files.exclude": {
           "type": "array",
           "items": {
             "type": "string"
@@ -94,32 +94,32 @@
     },
     "commands": [
       {
-        "command": "microbit-micropython.flash",
+        "command": "bbcmicrobit-micropython.flash",
         "title": "Flash",
         "category": "BBC micro:bit MicroPython"
       },
       {
-        "command": "microbit-micropython.saveHex",
+        "command": "bbcmicrobit-micropython.saveHex",
         "title": "Save Hex",
         "category": "BBC micro:bit MicroPython"
       },
       {
-        "command": "microbit-micropython.selectProjectFolder",
+        "command": "bbcmicrobit-micropython.selectProjectFolder",
         "title": "Select Project Folder",
         "category": "BBC micro:bit MicroPython"
       },
       {
-        "command": "microbit-micropython.connect",
+        "command": "bbcmicrobit-micropython.connect",
         "title": "Connect",
         "category": "BBC micro:bit MicroPython"
       },
       {
-        "command": "microbit-micropython.disconnect",
+        "command": "bbcmicrobit-micropython.disconnect",
         "title": "Disconnect",
         "category": "BBC micro:bit MicroPython"
       },
       {
-        "command": "microbit-micropython.openTerminal",
+        "command": "bbcmicrobit-micropython.openTerminal",
         "title": "Open Serial Terminal",
         "category": "BBC micro:bit MicroPython"
       }
@@ -127,12 +127,12 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "microbit-micropython.connect",
-          "when": "microbit-micropython.canPair"
+          "command": "bbcmicrobit-micropython.connect",
+          "when": "bbcmicrobit-micropython.canPair"
         },
         {
-          "command": "microbit-micropython.disconnect",
-          "when": "microbit-micropython.canPair"
+          "command": "bbcmicrobit-micropython.disconnect",
+          "when": "bbcmicrobit-micropython.canPair"
         }
       ]
     }

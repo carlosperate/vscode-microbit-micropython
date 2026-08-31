@@ -165,7 +165,7 @@ describe('the status bar menu', () => {
 		const missing = Object.values(COMMANDS).filter((id) => id !== COMMANDS.showMenu && !placed.has(id));
 		expect(missing, 'add these to the menu order').toEqual([]);
 
-		const withStranger = [...contributed, { command: 'microbit-micropython.invented', title: 'Invented' }];
+		const withStranger = [...contributed, { command: 'bbcmicrobit-micropython.invented', title: 'Invented' }];
 		for (const connected of [true, false]) {
 			const shown = menuCommands(withStranger, connected);
 			expect(shown[shown.length - 1]?.title, `connected=${connected}`).toBe('Invented');
