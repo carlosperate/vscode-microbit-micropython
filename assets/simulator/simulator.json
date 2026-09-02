@@ -1,0 +1,31 @@
+{
+	"ref": "v0.1.14",
+	"builtWith": {
+		"emscripten": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 3.1.25 (febd44b21ecaca86e2cb2a25ef3ed4a0a2076365)",
+		"simulator": "07b1ed74fc1ca1fb3414d22082fccaf63d004441",
+		"micropython-microbit-v2": "8aaa36b8d50211f5902d50e050632a88358d369f",
+		"micropython": "da4b38e7562dfa451917f9d7f344a7f26de8c7bd"
+	},
+	"files": [
+		{
+			"file": "LICENSE",
+			"sha256": "7a45ad7381b778cfc86772e4ced09fc0cabf8e598083cb196075babea900dc63"
+		},
+		{
+			"file": "build/firmware.js",
+			"sha256": "600b489a4879452617229136036453ca17abe5822c31cac364c8a7219bcd25fd"
+		},
+		{
+			"file": "build/firmware.wasm",
+			"sha256": "7aa7efb4883738eedf07c01526e2f36a0d53d9c67fdb253c0ca3f813625852bb"
+		},
+		{
+			"file": "build/simulator.js",
+			"sha256": "d6ee93477ce4344ad430c3fe3c0c10180c5e289fcd64fbd2d85dd12858a209b5"
+		},
+		{
+			"file": "simulator.html",
+			"sha256": "22d54e95e67c72adec888554c2ccf58895246cdb784336693516134778246f53"
+		}
+	]
+}

@@ -8,7 +8,8 @@
   "icon": "assets/icon.png",
   "scripts": {
     "build": "node config/esbuild.config.mjs",
-    "build:icon": "node config/build-icon.mjs",
+    "build:icon": "node build-scripts/build-icon.mjs",
+    "build:simulator": "node build-scripts/build-simulator.mjs",
     "build:integration": "esbuild test/integration/index.ts --bundle --outfile=test/integration/dist/index.js --format=cjs --platform=browser --main-fields=module,browser,main --external:vscode --log-level=warning",
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/node && tsc --noEmit -p test",
     "test": "vitest run --config config/vitest.config.mts",

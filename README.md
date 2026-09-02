@@ -20,7 +20,9 @@ https://github.com/carlosperate/vscode-microbit-micropython/issues
 5. To talk to the board, choose **Open Serial Terminal** from the same menu.
   Press `Ctrl+C` to interrupt the running program and get a MicroPython prompt.
 
-![Extension screenshot](assets/screenshot.png)
+<p align="center">
+  <img src="assets/screenshot.png" alt="Extension screenshot" width="75%" align="center"/>
+</p>
 
 ## What it does
 
@@ -77,3 +79,7 @@ The bundled MicroPython firmware images come from
 The MicroPython logo used in the extension icon comes from the
 [MicroPython project](https://github.com/micropython/micropython) under the
 MIT License.
+
+The micro:bit simulator is built from
+[micropython-microbit-v2-simulator](https://github.com/microbit-foundation/micropython-microbit-v2-simulator),
+under the MIT License.
