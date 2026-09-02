@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="1.5 3.5 21 17">
+  <title>micro:bit board</title>
+  <!-- The viewBox is the board's own bounding box, so it fills the icon slot
+       edge to edge instead of sitting in a square with margins around it. -->
+  <!-- VS Code masks this to the theme colour, so only the alpha survives: one
+       shape, holes cut with fill-rule evenodd, and no colour anywhere. The board
+       is the outline rather than a filled slab because the fringe, the logo and
+       the edge connector are all lighter than the board on the full-colour icon,
+       and a mask has no second tone to say so with. -->
+  <path fill-rule="evenodd" d="M4.5 3.5A3 3 0 0 0 1.5 6.5v11a3 3 0 0 0 3 3h15a3 3 0 0 0 3-3v-11a3 3 0 0 0-3-3z
+  M4.7 4.6A2.1 2.1 0 0 0 2.6 6.7v10.6a2.1 2.1 0 0 0 2.1 2.1h14.6a2.1 2.1 0 0 0 2.1-2.1V6.7a2.1 2.1 0 0 0-2.1-2.1z
+  M2.6 9.1V6.7a2.1 2.1 0 0 1 2.1-2.1h2.4z
+  M7.8 4.6h2.4L7.8 7z
+  M3 10h3.2v3.2H3zM17.8 10H21v3.2h-3.2z
+  M8.2 7.8h7.6v7.6H8.2z
+  M9.35 9.45h1v5.95h-1zM11.5 7.8h1v5.94h-1zM13.65 9.45h1v5.95h-1z
+  M4.06 16.09h16.68a.8.8 0 0 1 .8.8v1.02a.8.8 0 0 1-.8.8H4.06a.8.8 0 0 1-.8-.8v-1.02a.8.8 0 0 1 .8-.8z
+  M3.95 17.4a.79.79 0 1 0 1.58 0 .79.79 0 1 0-1.58 0
+  M7.54 17.4a.79.79 0 1 0 1.58 0 .79.79 0 1 0-1.58 0
+  M11.21 17.4a.79.79 0 1 0 1.58 0 .79.79 0 1 0-1.58 0
+  M14.88 17.4a.79.79 0 1 0 1.58 0 .79.79 0 1 0-1.58 0
+  M18.47 17.4a.79.79 0 1 0 1.58 0 .79.79 0 1 0-1.58 0"/>
+</svg>

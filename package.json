@@ -11,7 +11,7 @@
     "build:icon": "node build-scripts/build-icon.mjs",
     "build:simulator": "node build-scripts/build-simulator.mjs",
     "build:integration": "esbuild test/integration/index.ts --bundle --outfile=test/integration/dist/index.js --format=cjs --platform=browser --main-fields=module,browser,main --external:vscode --log-level=warning",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p src/node && tsc --noEmit -p test",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/node && tsc --noEmit -p src/webview && tsc --noEmit -p test",
     "test": "vitest run --config config/vitest.config.mts",
     "test:watch": "vitest --config config/vitest.config.mts",
     "test:integration": "npm run build && npm run build:integration && vscode-test-web --quality stable --headless --extensionDevelopmentPath=. --extensionTestsPath=./test/integration/dist/index.js ./test/workspace",
@@ -125,8 +125,31 @@
         "command": "bbcmicrobit-micropython.openTerminal",
         "title": "Open Serial Terminal",
         "category": "BBC micro:bit MicroPython"
+      },
+      {
+        "command": "bbcmicrobit-micropython.openSimulator",
+        "title": "Open Simulator",
+        "category": "BBC micro:bit MicroPython"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "bbcmicrobit-micropython",
+          "title": "MicroPython",
+          "icon": "assets/activitybar.svg"
+        }
+      ]
+    },
+    "views": {
+      "bbcmicrobit-micropython": [
+        {
+          "id": "bbcmicrobit-micropython.simulator",
+          "name": "Simulator",
+          "type": "webview"
+        }
+      ]
+    },
     "menus": {
       "commandPalette": [
         {

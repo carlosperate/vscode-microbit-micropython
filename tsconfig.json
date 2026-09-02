@@ -17,7 +17,8 @@
     "types": ["vscode", "w3c-web-serial", "w3c-web-usb"]
   },
   "include": ["src/**/*.ts"],
-  // src/node has its own project, with node's types. Nothing here imports it, so
-  // excluding it as a root keeps it out of this program entirely.
-  "exclude": ["node_modules", "dist", "src/node"]
+  // src/node and src/webview have their own projects, for node's types and for
+  // the DOM. Nothing here imports either, so excluding them as roots keeps them
+  // out of this program entirely.
+  "exclude": ["node_modules", "dist", "src/node", "src/webview"]
 }

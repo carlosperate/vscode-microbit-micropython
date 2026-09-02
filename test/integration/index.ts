@@ -6,6 +6,8 @@ import { hexFilename } from '../../src/filename';
 import { chooseWorkspaceFolder, resolveProject, selectWorkspaceFiles } from '../../src/files/workspace';
 import { readFirmware } from '../../src/hex/assets';
 import { buildFs, generateHex } from '../../src/hex/build';
+import { readSimulatorHtml } from '../../src/simulator/assets';
+import { VIEW_ID } from '../../src/simulator/view';
 import { connectToBoard, type UsbIdentity } from '../../src/usb/connect';
 
 /**
@@ -50,6 +52,7 @@ export async function run(): Promise<void> {
 	await checkActivation(extension);
 	await checkTheHostLoadedItsOwnEntry(extension);
 	await checkBothEntriesShip(extension);
+	await checkTheSimulatorShips(extension);
 	checkItRunsBesideTheHardware(extension);
 	checkAMountPointJoinsToAFile();
 	await checkContributedCommandsResolve(extension);
@@ -367,6 +370,30 @@ async function checkBothEntriesShip(extension: vscode.Extension<unknown>): Promi
 		const target = vscode.Uri.joinPath(extension.extensionUri, ...declared.replace(/^\.\//, '').split('/'));
 		record(`the ${field} entry is where the manifest says`, await exists(target), `${declared} -> ${target}`);
 	}
+}
+
+/**
+ * The simulator is a folder of files read at runtime and a view contributed by
+ * the manifest, so a packaging mistake shows up here rather than as a blank view
+ * on someone's machine. The document itself is deliberately not built: booting
+ * 1.2 MB of WebAssembly is timing-dependent, and a flaky check on the suite that
+ * gates every commit costs more than it catches.
+ */
+async function checkTheSimulatorShips(extension: vscode.Extension<unknown>): Promise<void> {
+	try {
+		const html = await readSimulatorHtml(extension.extensionUri);
+		record('the simulator assets are readable', html.includes('build/firmware.js'), `${html.length} characters`);
+	} catch (error) {
+		record('the simulator assets are readable', false, `from ${extension.extensionUri}: ${String(error)}`);
+	}
+
+	const shell = vscode.Uri.joinPath(extension.extensionUri, 'dist', 'webview', 'simulator.js');
+	record('the webview shell is where the document expects it', await exists(shell), `${shell}`);
+
+	const views: { id?: string; type?: string }[] =
+		extension.packageJSON?.contributes?.views?.['bbcmicrobit-micropython'] ?? [];
+	const view = views.find((entry) => entry.id === VIEW_ID);
+	record('the manifest contributes the simulator view', view?.type === 'webview', JSON.stringify(views));
 }
 
 /**

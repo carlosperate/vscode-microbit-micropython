@@ -9,6 +9,8 @@ export interface Contributed {
 /** In the order the work happens, which is neither the manifest's nor the palette's. */
 const WORK: readonly string[] = [
 	COMMANDS.flash,
+	// Beside Flash because it is the other way to run the program, not a detour.
+	COMMANDS.openSimulator,
 	COMMANDS.openTerminal,
 	COMMANDS.saveHex,
 	COMMANDS.selectProjectFolder,

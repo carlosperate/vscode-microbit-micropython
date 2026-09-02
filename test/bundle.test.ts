@@ -4,9 +4,10 @@
  * a `globalThis.process` written to get past the compiler, reaches the host
  * unseen by everything else.
  *
- * There are two, one per entry point, and an import crossing between them fails
- * only at runtime and only on the other platform, which is the failure this file
- * exists to turn into a red test.
+ * There are three: one per extension entry point, plus the shell that runs in the
+ * simulator's webview document. An import crossing between them fails only at
+ * runtime and only on the other platform, which is the failure this file exists
+ * to turn into a red test.
  */
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -20,12 +21,17 @@ import { build } from '../config/esbuild.config.mjs';
 let outDir: string;
 let browser: string;
 let node: string;
+let webview: string;
 
 beforeAll(async () => {
 	outDir = await mkdtemp(path.join(tmpdir(), 'microbit-micropython-build-'));
 	await build(outDir);
 	const read = (name: string) => readFile(path.join(outDir, 'dist', name), 'utf8');
-	[browser, node] = await Promise.all([read('browser.js'), read('node.js')]);
+	[browser, node, webview] = await Promise.all([
+		read('browser.js'),
+		read('node.js'),
+		read(path.join('webview', 'simulator.js')),
+	]);
 }, 60_000);
 
 afterAll(async () => {
@@ -113,4 +119,32 @@ it.each(webUsb)('the node bundle does not carry %s', (pattern) => {
  */
 it.each(BOTH)('the %s bundle has no serial port library of its own', (which) => {
 	expect(bundleFor(which)).not.toMatch(/\bserialport\b/);
+});
+
+/**
+ * The shell is a script tag in a document VS Code did not build, so it is neither
+ * a module the host loads nor a caller of the extension API: it reaches the
+ * extension only through `acquireVsCodeApi`.
+ */
+it('the webview bundle is a self-contained IIFE that needs no host', () => {
+	expect(webview).not.toContain('module.exports');
+	expect(required(webview)).toEqual([]);
+	expect(webview).not.toMatch(/\bfrom ["']vscode["']|require\(["']vscode["']\)/);
+	expect(webview).toContain('acquireVsCodeApi');
+});
+
+/**
+ * The prelude has to live in this bundle rather than in a template string in
+ * `src/`, where the literal `navigator` would reach the node bundle and fail the
+ * WebUSB guard above, which is that guard doing its job.
+ */
+it('the webview bundle carries the prelude, and the extension bundles do not', () => {
+	expect(webview).toMatch(/serviceWorker/);
+	expect(browser).not.toMatch(/serviceWorker/);
+	expect(node).not.toMatch(/serviceWorker/);
+});
+
+/** The stylesheet is imported as text and injected as one tag, not fetched. */
+it('the webview bundle carries its stylesheet inline', () => {
+	expect(webview).toContain('--vscode-button-secondaryBackground');
 });
