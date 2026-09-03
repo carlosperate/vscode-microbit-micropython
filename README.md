@@ -1,7 +1,7 @@
 # BBC micro:bit MicroPython
 
-Build and flash a MicroPython project to a BBC micro:bit, and connect to
-the device serial and REPL 🐍🤖.
+Build and flash a MicroPython project to a BBC micro:bit, connect to the device
+serial and REPL, or run your code in the built-in simulator 🐍🤖.
 
 Works on both desktop and web versions of VS Code and compatible editors.
 
@@ -12,12 +12,15 @@ https://github.com/carlosperate/vscode-microbit-micropython/issues
 ## How to use it
 
 1. Write your code in `main.py` (or any file in your project folder).
-2. Plug in your micro:bit with a USB cable.
-3. Click the micro:bit icon at the bottom of the window, a new menu appears at
-  the top, and choose **Flash**.
-4. Using non-Chromium browsers? Choose **Save Hex** instead, then drag the saved
+2. Click the micro:bit icon in the activity bar on the side and press play on
+  the board there, your code will run on the simulator.
+3. To run it on a real board, plug in your micro:bit with a USB cable.
+4. Click the **Flash** button.
+5. Using non-Chromium browsers? Click on the micro:bit icon in the status bar
+  at the bottom and choose **Save Hex** instead, then drag the saved
   file onto the `MICROBIT` drive that appears when you plug in the board.
-5. To talk to the board, choose **Open Serial Terminal** from the same menu.
+6. To talk to the board, choose **Open Serial Terminal** from the same menu or
+  the activity bar on the sidebar.
   Press `Ctrl+C` to interrupt the running program and get a MicroPython prompt.
 
 <p align="center">
@@ -26,6 +29,8 @@ https://github.com/carlosperate/vscode-microbit-micropython/issues
 
 ## What it does
 
+- **Run in Simulator:** Run your project on a simulated micro:bit in the side
+  bar.
 - **Direct Flash:** Send the built MicroPython hex to a connected micro:bit.
   In a Chromium based browser this goes over WebUSB, in desktop VS Code it uses
   the `MICROBIT` USB drive.
@@ -47,12 +52,15 @@ subfolder, run the **Select Project Folder** command to select it.
 
 ## What works where
 
-| | Flash | Serial REPL | Save Hex |
-|---|---|---|---|
-| Desktop VS Code | ✅ copies to the `MICROBIT` drive | ✅ native serial port | ✅ |
-| Chrome, Edge and other Chromium browsers | ✅ WebUSB | ✅ WebUSB | ✅ |
-| Firefox 151+ (desktop) | ❌ no WebUSB, use Save Hex | ❓ Web Serial (theoretically, known issue present) | ✅ |
-| Safari | ❌ no WebUSB, use Save Hex | ❌ no WebUSB or Web Serial | ✅ |
+| | Simulator | Flash | Serial REPL | Save Hex |
+|---|---|---|---|---|
+| Desktop VS Code | ✅ | ✅ copies to the `MICROBIT` drive | ✅ native serial port | ✅ |
+| Chrome, Edge and other Chromium browsers | ✅ | ✅ WebUSB | ✅ WebUSB | ✅ |
+| Firefox 151+ (desktop) | ✅ | ❌ no WebUSB, use Save Hex | ❓ Web Serial (theoretically, known issue present) | ✅ |
+| Safari | ✅ | ❌ no WebUSB, use Save Hex | ❌ no WebUSB or Web Serial | ✅ |
+
+The simulator is the one column that is a tick everywhere: it needs no board, no
+cable and no browser device API, only WebAssembly.
 
 ## Requirements
 
@@ -64,7 +72,7 @@ subfolder, run the **Select Project Folder** command to select it.
   is installed automatically with this extension, used to open a serial
   terminal.
 - The [MicroPython & CircuitPython IntelliSense extension](https://marketplace.visualstudio.com/items?itemName=carlosperate.micropython-lsp)
-  is installed automatically for autocomplete, type checking and inline
+  is installed automatically for autocomplete, type checking, and inline
   documentation.
 
 ## Licence

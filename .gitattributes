@@ -1,3 +1,7 @@
 # Intel and Universal hex is ASCII with LF endings, and git could change the
 # line endings based on each user config. Treat them as binary.
 *.hex -text
+
+# Build output copied byte for byte out of the container, with its sha256 pinned
+# in simulator.json. A CRLF checkout on Windows breaks every hash.
+assets/simulator/** -text

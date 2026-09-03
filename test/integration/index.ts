@@ -1,7 +1,7 @@
 import { microbitBoardId } from '@microbit/microbit-fs';
 import * as vscode from 'vscode';
 
-import { COMMANDS, DEVICE_VIEW_ID, SECTION, SERIAL_MONITOR_EXTENSION, SETTINGS } from '../../src/config';
+import { COMMANDS, DEVICE_VIEW_ID, PRODUCT, SECTION, SERIAL_MONITOR_EXTENSION, SETTINGS } from '../../src/config';
 import { hexFilename } from '../../src/filename';
 import { chooseWorkspaceFolder, resolveProject, selectWorkspaceFiles } from '../../src/files/workspace';
 import { readFirmware } from '../../src/hex/assets';
@@ -56,6 +56,7 @@ export async function run(): Promise<void> {
 	checkItRunsBesideTheHardware(extension);
 	checkAMountPointJoinsToAFile();
 	await checkContributedCommandsResolve(extension);
+	checkEveryCommandSaysWhoOwnsIt(extension);
 	await checkSerialMonitorCompanion();
 	await checkSelectionOnTheRealWorkspace();
 	const built = await checkHexBuildsFromTheRealWorkspace(extension);
@@ -468,6 +469,24 @@ async function checkContributedCommandsResolve(extension: vscode.Extension<unkno
 		missing.length
 			? `${missing.length} of ${contributed.length} contributed but never registered: ${missing.join(', ')}`
 			: `all ${contributed.length} contributed commands are registered`
+	);
+}
+
+/**
+ * A command with no category reads in the palette as a bare "Flash", beside the
+ * Foundation's own entries, with nothing saying which extension owns it. It is
+ * manifest-only, so a wrong one breaks nothing until somebody reads the palette.
+ */
+function checkEveryCommandSaysWhoOwnsIt(extension: vscode.Extension<unknown>): void {
+	const contributed: { command: string; category?: string }[] =
+		extension.packageJSON?.contributes?.commands ?? [];
+	const wrong = contributed.filter((entry) => entry.category !== PRODUCT);
+	record(
+		'every contributed command is filed under the product name',
+		contributed.length > 0 && wrong.length === 0,
+		wrong.length
+			? wrong.map((entry) => `${entry.command} is ${JSON.stringify(entry.category)}`).join(', ')
+			: `all ${contributed.length} carry "${PRODUCT}"`
 	);
 }
 
