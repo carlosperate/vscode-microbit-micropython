@@ -143,13 +143,22 @@ describe('the status bar menu', () => {
 		{ command: COMMANDS.openTerminal, title: 'Open Serial Terminal' },
 		{ command: COMMANDS.openSimulator, title: 'Open Simulator' },
 		{ command: COMMANDS.runInSimulator, title: 'Run in Simulator' },
+		{ command: COMMANDS.openSimulatorTerminal, title: 'Open Simulator Terminal' },
 	];
 
 	const titles = (connected: boolean | undefined) =>
 		menuCommands(contributed, connected).map((entry) => entry.title);
 
-	/** The two ways to run the program lead, then the simulator on its own, then the rest. */
-	const WORK = ['Flash', 'Run in Simulator', 'Open Simulator', 'Open Serial Terminal', 'Save Hex', 'Select Project Folder'];
+	/** The two ways to run the program lead, then the simulator on its own, the two terminals, then the rest. */
+	const WORK = [
+		'Flash',
+		'Run in Simulator',
+		'Open Simulator',
+		'Open Serial Terminal',
+		'Open Simulator Terminal',
+		'Save Hex',
+		'Select Project Folder',
+	];
 
 	/** Nothing below it works until it has been done, so it leads. */
 	it('puts Connect first while there is no board', () => {

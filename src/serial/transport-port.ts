@@ -1,10 +1,12 @@
-import { MICROBIT_FILTER } from '../usb/connect';
 import type { SerialPortLike, SerialTransport } from './types';
 
 export const SERIAL_BAUD_RATE = 115200;
 
+/** Through `typeof`: the desktop bundle compiles this too, and node's types declare the global as a value only. */
+type Decoder = InstanceType<typeof TextDecoder>;
+
 interface PortState {
-	decoder: TextDecoder;
+	decoder: Decoder;
 	readableController?: ReadableStreamDefaultController<Uint8Array>;
 	writableController?: WritableStreamDefaultController;
 	writableEnded: boolean;
@@ -12,24 +14,41 @@ interface PortState {
 	stopDisconnect?: () => void;
 }
 
-/** Adapts the connection's string events to the byte streams Eclipse consumes. */
-export class WebUsbSerialPort implements SerialPortLike {
+/** What the terminal is told about the device on the other end. */
+export interface PortDescription {
+	/** Eclipse names the terminal from this when given no name; `{}` reads as Unknown Vendor. */
+	info: SerialPortInfo;
+	/** Printed as the terminal closes, when the other end goes away. */
+	disconnected: string;
+	/** One line printed first, before anything the other end says. */
+	banner?: string;
+}
+
+/**
+ * Adapts a transport's string events to the byte streams Eclipse consumes. It
+ * takes the port's identity rather than knowing any device: the same adapter
+ * serves a WebUSB board and the simulator, and the desktop bundle carries it.
+ */
+export class TransportSerialPort implements SerialPortLike {
 	public readable: ReadableStream<Uint8Array> | null = null;
 	public writable: WritableStream<Uint8Array> | null = null;
 
 	private state: PortState | undefined;
 	private finishing: Promise<void> | undefined;
 
-	public constructor(private readonly transport: SerialTransport) {}
+	public constructor(
+		private readonly transport: SerialTransport,
+		private readonly description: PortDescription
+	) {}
 
 	public getInfo(): SerialPortInfo {
-		return { usbVendorId: MICROBIT_FILTER.vendorId, usbProductId: MICROBIT_FILTER.productId };
+		return this.description.info;
 	}
 
 	public async open(options: SerialOptions): Promise<void> {
-		if (this.state || this.finishing) throw new Error('The WebUSB serial port is already open.');
+		if (this.state || this.finishing) throw new Error('The serial port is already open.');
 		if (options.baudRate !== SERIAL_BAUD_RATE) {
-			throw new Error(`WebUSB serial currently supports ${SERIAL_BAUD_RATE} baud only.`);
+			throw new Error(`This serial port supports ${SERIAL_BAUD_RATE} baud only.`);
 		}
 
 		const state: PortState = { decoder: new TextDecoder(), writableEnded: false };
@@ -38,10 +57,10 @@ export class WebUsbSerialPort implements SerialPortLike {
 		this.readable = new ReadableStream<Uint8Array>({
 			start: (controller) => {
 				state.readableController = controller;
+				const { banner, disconnected } = this.description;
+				if (banner) controller.enqueue(encoder.encode(`${banner}\n`));
 				state.stopData = this.transport.onData((data) => controller.enqueue(encoder.encode(data)));
-				state.stopDisconnect = this.transport.onDisconnect(() =>
-					this.finish(new Error('The micro:bit was disconnected.'))
-				);
+				state.stopDisconnect = this.transport.onDisconnect(() => this.finish(new Error(disconnected)));
 			},
 			cancel: () => this.finish(undefined, false),
 		});
@@ -50,7 +69,7 @@ export class WebUsbSerialPort implements SerialPortLike {
 				state.writableController = controller;
 			},
 			write: async (data) => {
-				if (this.state !== state) throw new Error('The WebUSB serial port is closed.');
+				if (this.state !== state) throw new Error('The serial port is closed.');
 				const text = state.decoder.decode(data, { stream: true });
 				if (text) await this.transport.write(text);
 			},
@@ -97,7 +116,7 @@ export class WebUsbSerialPort implements SerialPortLike {
 					? writable.close()
 					: this.flush(state.decoder).finally(() => {
 							state.writableEnded = true;
-							state.writableController?.error(new Error('The WebUSB serial port is closed.'));
+							state.writableController?.error(new Error('The serial port is closed.'));
 						});
 		const tracked = finishing.finally(() => {
 			if (this.finishing === tracked) this.finishing = undefined;
@@ -106,7 +125,7 @@ export class WebUsbSerialPort implements SerialPortLike {
 		return tracked;
 	}
 
-	private async flush(decoder: TextDecoder): Promise<void> {
+	private async flush(decoder: Decoder): Promise<void> {
 		const trailing = decoder.decode();
 		if (trailing) await this.transport.write(trailing);
 	}

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { SERIAL_BAUD_RATE, WebUsbSerialPort } from '../src/serial/webusb-port';
+import { SERIAL_BAUD_RATE, TransportSerialPort } from '../src/serial/transport-port';
 import type { SerialTransport } from '../src/serial/types';
 
 class FakeTransport implements SerialTransport {
@@ -31,15 +31,57 @@ class FakeTransport implements SerialTransport {
 	}
 }
 
+const BOARD: SerialPortInfo = { usbVendorId: 0x0d28, usbProductId: 0x0204 };
+const GONE = 'The micro:bit was disconnected.';
+
 let transport: FakeTransport;
-let port: WebUsbSerialPort;
+let port: TransportSerialPort;
 
 beforeEach(() => {
 	transport = new FakeTransport();
-	port = new WebUsbSerialPort(transport);
+	port = new TransportSerialPort(transport, { info: BOARD, disconnected: GONE });
 });
 
-describe('the WebUSB Web Serial adapter', () => {
+const readAll = async (readable: ReadableStream<Uint8Array>, chunks: number): Promise<string> => {
+	const reader = readable.getReader();
+	let text = '';
+	for (let read = 0; read < chunks; read++) text += new TextDecoder().decode((await reader.read()).value);
+	reader.releaseLock();
+	return text;
+};
+
+describe('the Web Serial adapter over a transport', () => {
+	/**
+	 * Eclipse names a terminal from `getInfo()` when no name is passed, and reads
+	 * `{}` as `Unknown Vendor - Unknown Product`, so what goes in must come out
+	 * untouched: the ids for a board, and nothing at all for the simulator.
+	 */
+	it('hands back exactly the identity it was given', () => {
+		expect(port.getInfo()).toEqual(BOARD);
+		expect(new TransportSerialPort(transport, { info: {}, disconnected: GONE }).getInfo()).toEqual({});
+	});
+
+	/**
+	 * The one line that says which device this is, since the simulator's REPL
+	 * banner names the same board as hardware does. It has to land before anything
+	 * the other end says, and a port given none prints nothing of its own.
+	 */
+	it('prints the banner first, as a line, and only when given one', async () => {
+		const described = new TransportSerialPort(transport, {
+			info: {},
+			disconnected: GONE,
+			banner: 'This terminal is connected to the simulator.',
+		});
+		await described.open({ baudRate: SERIAL_BAUD_RATE });
+		transport.emitData('>>> ');
+		expect(await readAll(described.readable!, 2)).toBe('This terminal is connected to the simulator.\n>>> ');
+		await described.close();
+
+		await port.open({ baudRate: SERIAL_BAUD_RATE });
+		transport.emitData('>>> ');
+		expect(await readAll(port.readable!, 1)).toBe('>>> ');
+	});
+
 	it('attaches one listener and exposes incoming strings as bytes', async () => {
 		await port.open({ baudRate: SERIAL_BAUD_RATE });
 		expect(transport.dataListeners.size).toBe(1);
@@ -113,18 +155,17 @@ describe('the WebUSB Web Serial adapter', () => {
 		expect(transport.dataListeners.size).toBe(1);
 	});
 
-	it('ends the stream with a useful error when the board disconnects', async () => {
+	/** The message is the caller's: a board is disconnected, a simulator is stopped. */
+	it('ends the stream with the given message when the other end goes away', async () => {
 		await port.open({ baudRate: SERIAL_BAUD_RATE });
 		const reader = port.readable!.getReader();
 		const writer = port.writable!.getWriter();
 		const reading = reader.read();
 		transport.disconnect();
 
-		await expect(reading).rejects.toThrow('The micro:bit was disconnected.');
-		await expect(writer.closed).rejects.toThrow('The micro:bit was disconnected.');
-		await expect(writer.write(new TextEncoder().encode('late'))).rejects.toThrow(
-			'The micro:bit was disconnected.'
-		);
+		await expect(reading).rejects.toThrow(GONE);
+		await expect(writer.closed).rejects.toThrow(GONE);
+		await expect(writer.write(new TextEncoder().encode('late'))).rejects.toThrow(GONE);
 		expect(transport.dataListeners.size).toBe(0);
 		expect(port.readable).toBeNull();
 	});
@@ -141,7 +182,7 @@ describe('the WebUSB Web Serial adapter', () => {
 		expect(transport.writes.join('')).toBe('caf�');
 	});
 
-	it('refuses to pretend an unsupported WebUSB baud was applied', async () => {
+	it('refuses to pretend an unsupported baud was applied', async () => {
 		await expect(port.open({ baudRate: 9600 })).rejects.toThrow(`${SERIAL_BAUD_RATE} baud only`);
 		expect(transport.dataListeners.size).toBe(0);
 	});

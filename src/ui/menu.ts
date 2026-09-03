@@ -14,6 +14,7 @@ const WORK: readonly string[] = [
 	COMMANDS.runInSimulator,
 	COMMANDS.openSimulator,
 	COMMANDS.openTerminal,
+	COMMANDS.openSimulatorTerminal,
 	COMMANDS.saveHex,
 	COMMANDS.selectProjectFolder,
 ];

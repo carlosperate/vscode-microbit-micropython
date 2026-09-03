@@ -8,7 +8,7 @@ import { showMenu } from './commands/showMenu';
 import { COMMANDS, PRODUCT, type CommandId } from './config';
 import { createLog, log } from './log';
 import { createSerialMonitor } from './serial/eclipse';
-import { filesForSimulator, openSimulator, runInSimulator } from './simulator/commands';
+import { filesForSimulator, openSimulator, openSimulatorTerminal, runInSimulator } from './simulator/commands';
 import { createSimulator } from './simulator/view';
 
 export type CommandHandler = (context: vscode.ExtensionContext, ...args: unknown[]) => Promise<void>;
@@ -46,6 +46,7 @@ export function activateHost(context: vscode.ExtensionContext, host: Host): Exte
 		[COMMANDS.showMenu]: (forMenu) => showMenu(forMenu, host.boardAttached?.()),
 		[COMMANDS.openSimulator]: openSimulator(simulator),
 		[COMMANDS.runInSimulator]: runInSimulator(simulator),
+		[COMMANDS.openSimulatorTerminal]: openSimulatorTerminal(simulator),
 	};
 
 	// Manifest titles keep stub notifications in sync with the command palette.

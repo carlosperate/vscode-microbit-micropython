@@ -5,7 +5,7 @@ import { log } from '../log';
 import { openEclipseSerial, openNativeSerial } from '../serial/eclipse';
 import { reportSerialFailure } from '../serial/failure';
 import { openSerialRoute } from '../serial/route';
-import { SERIAL_BAUD_RATE, WebUsbSerialPort } from '../serial/webusb-port';
+import { SERIAL_BAUD_RATE, TransportSerialPort } from '../serial/transport-port';
 import { connectBoard, getSerialTransport, REQUEST_USB_DEVICE, usbAvailable } from '../usb/connection';
 import { MICROBIT_FILTER } from '../usb/connect';
 
@@ -51,7 +51,10 @@ async function openWebUsb(): Promise<boolean> {
 
 	return openEclipseSerial(
 		'webusb',
-		new WebUsbSerialPort(transport),
+		new TransportSerialPort(transport, {
+			info: { usbVendorId: MICROBIT_FILTER.vendorId, usbProductId: MICROBIT_FILTER.productId },
+			disconnected: 'The micro:bit was disconnected.',
+		}),
 		{ baudRate: SERIAL_BAUD_RATE },
 		PRODUCT
 	);

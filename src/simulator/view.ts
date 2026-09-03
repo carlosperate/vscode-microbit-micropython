@@ -4,9 +4,11 @@
  */
 import * as vscode from 'vscode';
 
-import { PRODUCT } from '../config';
+import { COMMANDS, PRODUCT } from '../config';
 import { log } from '../log';
+import type { SerialTransport } from '../serial/types';
 import { readSimulatorHtml, simulatorAssets } from './assets';
+import { SimulatorTransport, type SimulatorLink } from './connection';
 import { simulatorDocument } from './content';
 import type { EncodedFile, FromShell, SimulatorMessage, ToShell } from './protocol';
 import { ReadyGate, type Readiness } from './ready';
@@ -22,8 +24,12 @@ const UNLOGGED = new Set(['serial_output', 'state_change', 'log_output', 'radio_
 export interface Simulator extends vscode.Disposable {
 	/** Reveals the one view there is, resolving it if it has never been shown. */
 	show(): Promise<void>;
+	/** Waits for the document, or for the reason there is not going to be one. */
+	ready(): Promise<Readiness>;
 	/** Waits for the document and hands it the files; the caller reveals first. */
 	run(files: EncodedFile[]): Promise<Readiness>;
+	/** The board's serial port, alive across every document the view resolves. */
+	serial: SerialTransport;
 }
 
 /** The workspace files for the board, or nothing once the user has been told why not. */
@@ -38,6 +44,27 @@ export function createSimulator(context: vscode.ExtensionContext, provideFiles: 
 	let current: vscode.WebviewView | undefined;
 	const gate = new ReadyGate();
 
+	// The terminal outlives any one document, so it listens here and not on a webview.
+	const messageListeners = new Set<(message: FromShell) => void>();
+	const disposeListeners = new Set<() => void>();
+	const link: SimulatorLink = {
+		onMessage: (listener) => {
+			messageListeners.add(listener);
+			return () => messageListeners.delete(listener);
+		},
+		onDisposed: (listener) => {
+			disposeListeners.add(listener);
+			return () => disposeListeners.delete(listener);
+		},
+		// Nothing to post to between documents, and nothing is lost: a disposal has
+		// already ended whatever was writing. A rejection is logged, or the host swallows it.
+		post: (message) => {
+			void current?.webview
+				.postMessage(message)
+				.then(undefined, (error: unknown) => log(`Simulator: a message could not be posted: ${String(error)}`));
+		},
+	};
+
 	const provider: vscode.WebviewViewProvider = {
 		resolveWebviewView(view) {
 			current = view;
@@ -47,6 +74,7 @@ export function createSimulator(context: vscode.ExtensionContext, provideFiles: 
 				if (current !== view) return;
 				current = undefined;
 				gate.reset();
+				for (const listener of disposeListeners) listener();
 			});
 
 			view.webview.options = {
@@ -56,7 +84,10 @@ export function createSimulator(context: vscode.ExtensionContext, provideFiles: 
 					vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview'),
 				],
 			};
-			view.webview.onDidReceiveMessage((message: FromShell) => receive(view.webview, message));
+			view.webview.onDidReceiveMessage((message: FromShell) => {
+				receive(view.webview, message);
+				for (const listener of messageListeners) listener(message);
+			});
 
 			void load(view.webview);
 		},
@@ -79,6 +110,12 @@ export function createSimulator(context: vscode.ExtensionContext, provideFiles: 
 				return;
 			case 'control':
 				log(`Simulator: ${message.control} pressed`);
+				// The strip's button runs the same command as the palette, so the two cannot drift.
+				if (message.control === 'terminal') {
+					void vscode.commands
+						.executeCommand(COMMANDS.openSimulatorTerminal)
+						.then(undefined, (error: unknown) => log(`Simulator: the terminal button failed: ${String(error)}`));
+				}
 				return;
 			case 'notification':
 				logNotification(message.notification);
@@ -142,17 +179,24 @@ export function createSimulator(context: vscode.ExtensionContext, provideFiles: 
 		if (gate.current()?.kind === 'failed') void load(current.webview);
 	}
 
+	const ready = () => gate.wait(READY_TIMEOUT_MS);
+
 	return {
 		dispose: () => registration.dispose(),
 		show,
+		ready,
 		run: async (files) => {
-			const outcome = await gate.wait(READY_TIMEOUT_MS);
+			const outcome = await ready();
 			if (outcome.kind !== 'ready') return outcome;
 			const webview = current?.webview;
 			if (!webview) return { kind: 'failed', detail: 'the view went away while it was loading' };
-			await webview.postMessage({ kind: 'files', files } satisfies ToShell);
+			// `false`, not a throw, when the view has gone in the meantime.
+			if (!(await webview.postMessage({ kind: 'files', files } satisfies ToShell))) {
+				return { kind: 'failed', detail: 'the files could not be delivered, the view has gone' };
+			}
 			return outcome;
 		},
+		serial: new SimulatorTransport(link),
 	};
 }
 

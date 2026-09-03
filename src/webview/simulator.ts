@@ -75,7 +75,17 @@ function fromHost(message: ToShell): void {
 			// Only now has something run that a Reset could bring back.
 			reset?.removeAttribute('disabled');
 		} else if (note) note.hidden = false;
-	}
+	} else if (message.kind === 'terminal') setTerminalOpen(message.open);
+}
+
+/** Kept apart from the button: the host may say so before there is a body to show it in. */
+let terminalOpen = false;
+
+/** Greyed out while a terminal is open, which is also how the strip says there is one. */
+function setTerminalOpen(open: boolean): void {
+	terminalOpen = open;
+	terminal?.toggleAttribute('disabled', open);
+	if (terminal) terminal.title = open ? 'A serial terminal is already open.' : 'Open a serial terminal on the board.';
 }
 
 /**
@@ -110,6 +120,7 @@ window.addEventListener('unhandledrejection', (event) =>
 
 let stop: HTMLButtonElement | undefined;
 let reset: HTMLButtonElement | undefined;
+let terminal: HTMLButtonElement | undefined;
 let note: HTMLElement | undefined;
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -184,6 +195,11 @@ function controls(): HTMLElement {
 		send({ kind: 'control', control: 'sound', on: !muted });
 	});
 	strip.append(sound);
+
+	// The extension opens it: the terminal is Eclipse's, in another part of the window.
+	terminal = button('Terminal', () => send({ kind: 'control', control: 'terminal' }));
+	setTerminalOpen(terminalOpen);
+	strip.append(terminal);
 
 	return strip;
 }

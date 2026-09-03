@@ -19,10 +19,11 @@ export interface EncodedFile {
 	data: string;
 }
 
-/** Extension host to shell. */
+/** Extension host to shell. `terminal` says whether a serial terminal is reading the board. */
 export type ToShell =
 	| { kind: 'command'; command: SimulatorMessage }
-	| { kind: 'files'; files: EncodedFile[] };
+	| { kind: 'files'; files: EncodedFile[] }
+	| { kind: 'terminal'; open: boolean };
 
 /**
  * Shell to extension host. `failed` means the document cannot run and only the
@@ -31,7 +32,7 @@ export type ToShell =
 export type FromShell =
 	| { kind: 'ready' }
 	| { kind: 'notification'; notification: SimulatorMessage }
-	| { kind: 'control'; control: 'stop' | 'reset' | 'sound'; on?: boolean }
+	| { kind: 'control'; control: 'stop' | 'reset' | 'sound' | 'terminal'; on?: boolean }
 	| { kind: 'failed'; detail: string }
 	| { kind: 'error'; detail: string };
 

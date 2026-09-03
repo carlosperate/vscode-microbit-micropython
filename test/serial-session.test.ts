@@ -46,6 +46,78 @@ describe('Eclipse terminal handles', () => {
 		expect(monitor.openSerial).toHaveBeenCalledTimes(2);
 	});
 
+	/** A board and the simulator are two devices, so each gets its own terminal. */
+	it('opens a second terminal for the simulator beside the board’s', async () => {
+		const monitor = api();
+		vi.mocked(monitor.openSerial).mockResolvedValueOnce('board').mockResolvedValueOnce('simulator');
+
+		await session.open(monitor, 'webusb');
+		await expect(session.open(monitor, 'simulator')).resolves.toBe(true);
+		expect(monitor.revealSerial).not.toHaveBeenCalled();
+		expect(monitor.openSerial).toHaveBeenCalledTimes(2);
+
+		await session.open(monitor, 'simulator');
+		expect(monitor.revealSerial).toHaveBeenCalledExactlyOnceWith('simulator');
+		expect(monitor.openSerial).toHaveBeenCalledTimes(2);
+	});
+
+	/**
+	 * The case a single slot gets wrong: opening the simulator's terminal made it
+	 * forget the board's, so asking for the board again opened a third terminal and
+	 * orphaned the first.
+	 */
+	it('reveals the board’s terminal again after the simulator’s was opened', async () => {
+		const monitor = api();
+		vi.mocked(monitor.openSerial).mockResolvedValueOnce('board').mockResolvedValueOnce('simulator');
+
+		await session.open(monitor, 'webusb');
+		await session.open(monitor, 'simulator');
+		await expect(session.open(monitor, 'webusb')).resolves.toBe(true);
+
+		expect(monitor.revealSerial).toHaveBeenCalledExactlyOnceWith('board');
+		expect(monitor.openSerial).toHaveBeenCalledTimes(2);
+	});
+
+	/**
+	 * A double click on a button reaches here twice before Eclipse has answered
+	 * once, and both callers would otherwise see no handle and open a terminal each.
+	 */
+	it('shares an open in flight, so two requests before Eclipse answers make one terminal', async () => {
+		const monitor = api();
+		let answer: (handle: string) => void = () => undefined;
+		vi.mocked(monitor.openSerial).mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+
+		const first = session.open(monitor, 'simulator');
+		const second = session.open(monitor, 'simulator');
+		answer('simulator');
+		await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+		expect(monitor.openSerial).toHaveBeenCalledOnce();
+
+		await session.open(monitor, 'simulator');
+		expect(monitor.revealSerial).toHaveBeenCalledExactlyOnceWith('simulator');
+		expect(monitor.openSerial).toHaveBeenCalledOnce();
+	});
+
+	it('does not make the board wait for the simulator, or the other way round', async () => {
+		const monitor = api();
+		vi.mocked(monitor.openSerial).mockResolvedValueOnce('board').mockResolvedValueOnce('simulator');
+
+		await expect(Promise.all([session.open(monitor, 'webusb'), session.open(monitor, 'simulator')])).resolves.toEqual([
+			true,
+			true,
+		]);
+		expect(monitor.openSerial).toHaveBeenCalledTimes(2);
+	});
+
+	it('lets a failed open be tried again rather than sharing the failure for good', async () => {
+		const monitor = api();
+		vi.mocked(monitor.openSerial).mockRejectedValueOnce(new Error('busy')).mockResolvedValueOnce('later');
+
+		await expect(session.open(monitor, 'simulator')).rejects.toThrow('busy');
+		await expect(session.open(monitor, 'simulator')).resolves.toBe(true);
+		expect(monitor.openSerial).toHaveBeenCalledTimes(2);
+	});
+
 	it('forgets the handle on disposal without closing Eclipse internals', async () => {
 		const monitor = api();
 		await session.open(monitor, 'webusb');

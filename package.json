@@ -135,6 +135,11 @@
         "command": "bbcmicrobit-micropython.runInSimulator",
         "title": "Run in Simulator",
         "category": "BBC micro:bit MicroPython"
+      },
+      {
+        "command": "bbcmicrobit-micropython.openSimulatorTerminal",
+        "title": "Open Simulator Terminal",
+        "category": "BBC micro:bit MicroPython"
       }
     ],
     "viewsContainers": {
