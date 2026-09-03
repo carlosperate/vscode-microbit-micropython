@@ -10,6 +10,7 @@ import { createLog, log } from './log';
 import { createSerialMonitor } from './serial/eclipse';
 import { filesForSimulator, openSimulator, openSimulatorTerminal, runInSimulator } from './simulator/commands';
 import { createSimulator } from './simulator/view';
+import { createDeviceView } from './ui/device';
 
 export type CommandHandler = (context: vscode.ExtensionContext, ...args: unknown[]) => Promise<void>;
 
@@ -35,6 +36,7 @@ export function activateHost(context: vscode.ExtensionContext, host: Host): Exte
 	log(`Extension activated, ${host.entry} entry`);
 
 	createSerialMonitor(context);
+	createDeviceView(context);
 	host.start(context);
 
 	// The simulator is the one feature that belongs to both hosts, so it is wired

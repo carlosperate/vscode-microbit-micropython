@@ -1,7 +1,7 @@
 import { microbitBoardId } from '@microbit/microbit-fs';
 import * as vscode from 'vscode';
 
-import { COMMANDS, SECTION, SERIAL_MONITOR_EXTENSION, SETTINGS } from '../../src/config';
+import { COMMANDS, DEVICE_VIEW_ID, SECTION, SERIAL_MONITOR_EXTENSION, SETTINGS } from '../../src/config';
 import { hexFilename } from '../../src/filename';
 import { chooseWorkspaceFolder, resolveProject, selectWorkspaceFiles } from '../../src/files/workspace';
 import { readFirmware } from '../../src/hex/assets';
@@ -399,6 +399,11 @@ async function checkTheSimulatorShips(extension: vscode.Extension<unknown>): Pro
 		extension.packageJSON?.contributes?.views?.['bbcmicrobit-micropython'] ?? [];
 	const view = views.find((entry) => entry.id === VIEW_ID);
 	record('the manifest contributes the simulator view', view?.type === 'webview', JSON.stringify(views));
+	record(
+		'the device section sits above the simulator',
+		views[0]?.id === DEVICE_VIEW_ID && views[1]?.id === VIEW_ID,
+		views.map((entry) => entry.id).join(' then ')
+	);
 }
 
 /**

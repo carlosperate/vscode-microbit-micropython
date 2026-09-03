@@ -52,6 +52,8 @@ export function menuCommands(contributed: readonly Contributed[], connected: boo
 function allowed(command: string, connected: boolean | undefined): boolean {
 	if (command === COMMANDS.connect) return connected === false;
 	if (command === COMMANDS.disconnect) return connected === true;
+	// Contributed for the device section's header icon, and it opens this very menu.
+	if (command === COMMANDS.showMenu) return false;
 	return true;
 }
 

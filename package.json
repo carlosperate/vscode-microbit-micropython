@@ -140,13 +140,19 @@
         "command": "bbcmicrobit-micropython.openSimulatorTerminal",
         "title": "Open Simulator Terminal",
         "category": "BBC micro:bit MicroPython"
+      },
+      {
+        "command": "bbcmicrobit-micropython.showMenu",
+        "title": "See All Options",
+        "category": "BBC micro:bit MicroPython",
+        "icon": "$(ellipsis)"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
           "id": "bbcmicrobit-micropython",
-          "title": "MicroPython",
+          "title": "BBC micro:bit MicroPython",
           "icon": "assets/activitybar.svg"
         }
       ]
@@ -154,12 +160,26 @@
     "views": {
       "bbcmicrobit-micropython": [
         {
+          "id": "bbcmicrobit-micropython.device",
+          "name": "Device",
+          "icon": "assets/activitybar.svg",
+          "initialSize": 1
+        },
+        {
           "id": "bbcmicrobit-micropython.simulator",
           "name": "Simulator",
-          "type": "webview"
+          "type": "webview",
+          "icon": "assets/activitybar.svg",
+          "initialSize": 9
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "bbcmicrobit-micropython.device",
+        "contents": "[$(zap) Flash](command:bbcmicrobit-micropython.flash)\n[$(terminal) Serial Terminal](command:bbcmicrobit-micropython.openTerminal)"
+      }
+    ],
     "menus": {
       "commandPalette": [
         {
@@ -169,6 +189,17 @@
         {
           "command": "bbcmicrobit-micropython.disconnect",
           "when": "bbcmicrobit-micropython.canPair"
+        },
+        {
+          "command": "bbcmicrobit-micropython.showMenu",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "bbcmicrobit-micropython.showMenu",
+          "when": "view == bbcmicrobit-micropython.device",
+          "group": "navigation"
         }
       ]
     }

@@ -14,8 +14,8 @@ export const COMMANDS = {
 	runInSimulator: 'bbcmicrobit-micropython.runInSimulator',
 	openSimulatorTerminal: 'bbcmicrobit-micropython.openSimulatorTerminal',
 	/**
-	 * Registered, deliberately not contributed. It opens a menu of the palette's
-	 * own entries, so a palette entry for it would be noise.
+	 * Opens a menu of the palette's own entries, so it is hidden from the palette
+	 * and from that menu; contributed only for the icon in the device section's header.
 	 */
 	showMenu: 'bbcmicrobit-micropython.showMenu',
 } as const;
@@ -48,3 +48,6 @@ export const SERIAL_MONITOR_EXTENSION = 'eclipse-cdt.serial-monitor';
  * chooser would hide them too, which is the right answer there as well.
  */
 export const CAN_PAIR_CONTEXT = 'bbcmicrobit-micropython.canPair';
+
+/** The device section: welcome content over a tree that stays empty. */
+export const DEVICE_VIEW_ID = 'bbcmicrobit-micropython.device';

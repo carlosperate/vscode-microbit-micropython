@@ -144,6 +144,7 @@ describe('the status bar menu', () => {
 		{ command: COMMANDS.openSimulator, title: 'Open Simulator' },
 		{ command: COMMANDS.runInSimulator, title: 'Run in Simulator' },
 		{ command: COMMANDS.openSimulatorTerminal, title: 'Open Simulator Terminal' },
+		{ command: COMMANDS.showMenu, title: 'See All Options' },
 	];
 
 	const titles = (connected: boolean | undefined) =>
@@ -177,6 +178,11 @@ describe('the status bar menu', () => {
 	 */
 	it('offers neither where no board can be paired', () => {
 		expect(titles(undefined)).toEqual(WORK);
+	});
+
+	/** The command that opens this menu is contributed for a header icon, and would list itself otherwise. */
+	it('never offers the command that opens it', () => {
+		for (const connected of [true, false, undefined]) expect(titles(connected)).not.toContain('See All Options');
 	});
 
 	/**
