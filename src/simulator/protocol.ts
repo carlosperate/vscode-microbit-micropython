@@ -38,6 +38,9 @@ export type FromShell =
 /** Ours, on the way in, so the shell can skip what it sent itself. */
 export const FROM_SHELL = '__fromShell';
 
+/** Everything the document needs at runtime, relative to `assets/simulator/`: one list for both ends. */
+export const RUNTIME_FILES = ['simulator.html', 'build/firmware.js', 'build/simulator.js', 'build/firmware.wasm'];
+
 /** Neither end throws on a message it does not know. */
 export const isMessage = (value: unknown): value is SimulatorMessage =>
 	typeof value === 'object' && value !== null && typeof (value as SimulatorMessage).kind === 'string';
@@ -61,6 +64,10 @@ export function fromBase64(data: string): Uint8Array {
 	for (let at = 0; at < binary.length; at += 1) bytes[at] = binary.charCodeAt(at);
 	return bytes;
 }
+
+/** The workspace selection, ready to cross to the shell. */
+export const encodeFiles = (files: readonly { name: string; data: Uint8Array }[]): EncodedFile[] =>
+	files.map((file) => ({ name: file.name, data: toBase64(file.data) }));
 
 /**
  * `Object.fromEntries` and never `record[name] = data`: a file called

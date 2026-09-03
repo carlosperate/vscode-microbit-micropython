@@ -1,8 +1,7 @@
 {
-	// The shell is a document, so it needs the DOM the root project deliberately
-	// leaves out: there, `lib` is WebWorker only, which is what stops a web
-	// extension compiling a reference to something a Worker does not have.
-	// No `vscode` and no node types: the shell has neither at runtime.
+	// A document, not a worker: it needs the DOM the root project deliberately
+	// keeps out of `lib`, and neither `vscode` nor node's types, which it has
+	// neither of at runtime.
 	"extends": "../../tsconfig.json",
 	"compilerOptions": {
 		"lib": ["ES2020", "DOM"],

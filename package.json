@@ -130,6 +130,11 @@
         "command": "bbcmicrobit-micropython.openSimulator",
         "title": "Open Simulator",
         "category": "BBC micro:bit MicroPython"
+      },
+      {
+        "command": "bbcmicrobit-micropython.runInSimulator",
+        "title": "Run in Simulator",
+        "category": "BBC micro:bit MicroPython"
       }
     ],
     "viewsContainers": {

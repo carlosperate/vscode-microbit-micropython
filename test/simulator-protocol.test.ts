@@ -3,7 +3,7 @@
  */
 import { expect, it } from 'vitest';
 
-import { fromBase64, isMessage, toBase64, toFilesystem } from '../src/simulator/protocol';
+import { encodeFiles, fromBase64, isMessage, toBase64, toFilesystem } from '../src/simulator/protocol';
 
 it('round trips bytes that are not valid UTF-8', () => {
 	const bytes = new Uint8Array([0x00, 0xff, 0xfe, 0x80, 0x41, 0x0a]);
@@ -22,13 +22,16 @@ it('round trips a file larger than the chunk size', () => {
 	expect(fromBase64(encoded)).toEqual(bytes);
 });
 
-it('builds a filesystem record without touching the prototype', () => {
-	const filesystem = toFilesystem([
-		{ name: 'main.py', data: toBase64(new Uint8Array([1, 2])) },
-		{ name: '__proto__', data: toBase64(new Uint8Array([3])) },
-	]);
+/** A selection as the command hands it over, and the record the board gets back. */
+it('carries every selected file to the board, including one named __proto__', () => {
+	const selected = [
+		{ name: 'main.py', data: new Uint8Array([0x70, 0x72]) },
+		{ name: '__proto__', data: new Uint8Array([0xff]) },
+	];
+	const filesystem = toFilesystem(encodeFiles(selected));
 	expect(Object.keys(filesystem).sort()).toEqual(['__proto__', 'main.py']);
-	expect([...filesystem['__proto__']]).toEqual([3]);
+	expect([...filesystem['main.py']]).toEqual([0x70, 0x72]);
+	expect([...filesystem['__proto__']]).toEqual([0xff]);
 	expect(Object.getPrototypeOf(filesystem)).toBe(Object.prototype);
 });
 

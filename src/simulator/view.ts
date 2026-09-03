@@ -8,22 +8,35 @@ import { PRODUCT } from '../config';
 import { log } from '../log';
 import { readSimulatorHtml, simulatorAssets } from './assets';
 import { simulatorDocument } from './content';
-import type { FromShell } from './protocol';
+import type { EncodedFile, FromShell, SimulatorMessage, ToShell } from './protocol';
+import { ReadyGate, type Readiness } from './ready';
 
 export const VIEW_ID = 'bbcmicrobit-micropython.simulator';
+
+/** Generous: the shell reports at DOMContentLoaded, long before any WebAssembly runs. */
+const READY_TIMEOUT_MS = 10 * 1000;
+
+/** One line per serial write, sensor tick, log row or radio packet would bury the channel. */
+const UNLOGGED = new Set(['serial_output', 'state_change', 'log_output', 'radio_output']);
 
 export interface Simulator extends vscode.Disposable {
 	/** Reveals the one view there is, resolving it if it has never been shown. */
 	show(): Promise<void>;
+	/** Waits for the document and hands it the files; the caller reveals first. */
+	run(files: EncodedFile[]): Promise<Readiness>;
 }
+
+/** The workspace files for the board, or nothing once the user has been told why not. */
+export type ProvideFiles = () => Promise<EncodedFile[] | undefined>;
 
 /**
  * The current view hangs off this rather than off a module variable: a module
  * singleton survives `deactivate()`, so a second activation in the same host,
  * which is what the integration tests do, would inherit the first one's view.
  */
-export function createSimulator(context: vscode.ExtensionContext): Simulator {
+export function createSimulator(context: vscode.ExtensionContext, provideFiles: ProvideFiles): Simulator {
 	let current: vscode.WebviewView | undefined;
+	const gate = new ReadyGate();
 
 	const provider: vscode.WebviewViewProvider = {
 		resolveWebviewView(view) {
@@ -31,7 +44,9 @@ export function createSimulator(context: vscode.ExtensionContext): Simulator {
 			// A move to another container or a window reload disposes the view and
 			// resolves a fresh one; hiding does not. Neither is an error.
 			view.onDidDispose(() => {
-				if (current === view) current = undefined;
+				if (current !== view) return;
+				current = undefined;
+				gate.reset();
 			});
 
 			view.webview.options = {
@@ -41,24 +56,72 @@ export function createSimulator(context: vscode.ExtensionContext): Simulator {
 					vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview'),
 				],
 			};
-			view.webview.onDidReceiveMessage((message: FromShell) => {
-				// Unknown kinds are ignored rather than thrown on, so a simulator bump
-				// that adds a message does not break an older extension.
-				if (message?.kind === 'failed') {
-					log(`Simulator failed: ${message.detail}`);
-					// A board that renders and cannot run is worse than one that says so:
-					// upstream reports `ready` before it ever touches the WebAssembly, so
-					// this is the only warning a broken load gives.
-					view.webview.html = failed();
-				} else if (message?.kind === 'error') log(`Simulator error: ${message.detail}`);
-				else if (message?.kind === 'notification') log(`Simulator: ${message.notification.kind}`);
-				else if (message?.kind === 'control') log(`Simulator: ${message.control} pressed`);
-				else if (message?.kind === 'ready') log('Simulator: the view is up');
-			});
+			view.webview.onDidReceiveMessage((message: FromShell) => receive(view.webview, message));
 
-			void load(context, view.webview);
+			void load(view.webview);
 		},
 	};
+
+	function receive(webview: vscode.Webview, message: FromShell): void {
+		// Unknown kinds fall through untouched, so a simulator bump that adds a
+		// message does not break an older extension.
+		switch (message?.kind) {
+			case 'ready':
+				log('Simulator: the view is up');
+				gate.settle({ kind: 'ready' });
+				return;
+			case 'failed':
+				log(`Simulator failed: ${message.detail}`);
+				fail(webview, message.detail);
+				return;
+			case 'error':
+				log(`Simulator error: ${message.detail}`);
+				return;
+			case 'control':
+				log(`Simulator: ${message.control} pressed`);
+				return;
+			case 'notification':
+				logNotification(message.notification);
+				if (message.notification.kind === 'request_flash') void sendFiles(webview);
+				return;
+		}
+	}
+
+	/**
+	 * The board's own play button runs the workspace, so it asks for the files
+	 * the way the command does; a refusal has already said why.
+	 */
+	async function sendFiles(webview: vscode.Webview): Promise<void> {
+		const files = await provideFiles();
+		if (!files) return;
+		// `false`, not a throw, when the view has gone in the meantime.
+		if (!(await webview.postMessage({ kind: 'files', files } satisfies ToShell))) {
+			log('Simulator: the files could not be delivered, the view has gone');
+		}
+	}
+
+	async function load(webview: vscode.Webview): Promise<void> {
+		gate.reset();
+		try {
+			const upstream = await readSimulatorHtml(context.extensionUri);
+			webview.html = simulatorDocument(upstream, {
+				assets: webview.asWebviewUri(simulatorAssets(context.extensionUri)).toString(),
+				script: webview
+					.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview', 'simulator.js'))
+					.toString(),
+				cspSource: webview.cspSource,
+			});
+		} catch (error) {
+			log(`Could not load the simulator: ${String(error)}`);
+			fail(webview, String(error));
+		}
+	}
+
+	/** A blank view is indistinguishable from a hang, so the view says so and the gate says why. */
+	function fail(webview: vscode.Webview, detail: string): void {
+		gate.settle({ kind: 'failed', detail });
+		webview.html = failed();
+	}
 
 	const registration = vscode.window.registerWebviewViewProvider(VIEW_ID, provider, {
 		// Not optional: without it the document is deallocated when the view is
@@ -67,33 +130,36 @@ export function createSimulator(context: vscode.ExtensionContext): Simulator {
 	});
 	context.subscriptions.push(registration);
 
+	async function show(): Promise<void> {
+		// `<viewId>.focus` is VS Code's own, and the only way to reveal a view
+		// that has never been resolved and so has no `show()` to call.
+		if (!current) {
+			await vscode.commands.executeCommand(`${VIEW_ID}.focus`);
+			return;
+		}
+		current.show(true);
+		// A retained view is never resolved again on its own, so revealing retries a failed load.
+		if (gate.current()?.kind === 'failed') void load(current.webview);
+	}
+
 	return {
 		dispose: () => registration.dispose(),
-		show: async () => {
-			// `<viewId>.focus` is VS Code's own, and the only way to reveal a view
-			// that has never been resolved and so has no `show()` to call.
-			if (current) current.show(true);
-			else await vscode.commands.executeCommand(`${VIEW_ID}.focus`);
+		show,
+		run: async (files) => {
+			const outcome = await gate.wait(READY_TIMEOUT_MS);
+			if (outcome.kind !== 'ready') return outcome;
+			const webview = current?.webview;
+			if (!webview) return { kind: 'failed', detail: 'the view went away while it was loading' };
+			await webview.postMessage({ kind: 'files', files } satisfies ToShell);
+			return outcome;
 		},
 	};
 }
 
-async function load(context: vscode.ExtensionContext, webview: vscode.Webview): Promise<void> {
-	try {
-		const upstream = await readSimulatorHtml(context.extensionUri);
-		webview.html = simulatorDocument(upstream, {
-			assets: webview.asWebviewUri(simulatorAssets(context.extensionUri)).toString(),
-			script: webview
-				.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview', 'simulator.js'))
-				.toString(),
-			cspSource: webview.cspSource,
-		});
-	} catch (error) {
-		// A blank view is indistinguishable from a hang, so say so in the view and
-		// leave the detail where a user can read it.
-		log(`Could not load the simulator: ${String(error)}`);
-		webview.html = failed();
-	}
+function logNotification(notification: SimulatorMessage): void {
+	if (UNLOGGED.has(notification.kind)) return;
+	if (notification.kind === 'internal_error') log(`Simulator internal error: ${String(notification.error)}`);
+	else log(`Simulator: ${notification.kind}`);
 }
 
 function failed(): string {

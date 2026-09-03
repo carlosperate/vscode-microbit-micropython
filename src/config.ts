@@ -11,6 +11,7 @@ export const COMMANDS = {
 	disconnect: 'bbcmicrobit-micropython.disconnect',
 	openTerminal: 'bbcmicrobit-micropython.openTerminal',
 	openSimulator: 'bbcmicrobit-micropython.openSimulator',
+	runInSimulator: 'bbcmicrobit-micropython.runInSimulator',
 	/**
 	 * Registered, deliberately not contributed. It opens a menu of the palette's
 	 * own entries, so a palette entry for it would be noise.

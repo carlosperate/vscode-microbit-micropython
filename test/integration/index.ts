@@ -373,11 +373,10 @@ async function checkBothEntriesShip(extension: vscode.Extension<unknown>): Promi
 }
 
 /**
- * The simulator is a folder of files read at runtime and a view contributed by
- * the manifest, so a packaging mistake shows up here rather than as a blank view
- * on someone's machine. The document itself is deliberately not built: booting
- * 1.2 MB of WebAssembly is timing-dependent, and a flaky check on the suite that
- * gates every commit costs more than it catches.
+ * The simulator is a folder read at runtime and a view the manifest contributes,
+ * so a packaging mistake shows up here rather than as a blank view on someone's
+ * machine. Booting the WebAssembly is timing-dependent, so the document itself is
+ * not built here; the driven checks cover that.
  */
 async function checkTheSimulatorShips(extension: vscode.Extension<unknown>): Promise<void> {
 	try {
@@ -387,8 +386,14 @@ async function checkTheSimulatorShips(extension: vscode.Extension<unknown>): Pro
 		record('the simulator assets are readable', false, `from ${extension.extensionUri}: ${String(error)}`);
 	}
 
+	// Read rather than stat: on web the stat answers for any URI, present or not.
 	const shell = vscode.Uri.joinPath(extension.extensionUri, 'dist', 'webview', 'simulator.js');
-	record('the webview shell is where the document expects it', await exists(shell), `${shell}`);
+	try {
+		const bytes = await vscode.workspace.fs.readFile(shell);
+		record('the webview shell is where the document expects it', bytes.length > 0, `${shell}, ${bytes.length} bytes`);
+	} catch (error) {
+		record('the webview shell is where the document expects it', false, `${shell}: ${String(error)}`);
+	}
 
 	const views: { id?: string; type?: string }[] =
 		extension.packageJSON?.contributes?.views?.['bbcmicrobit-micropython'] ?? [];

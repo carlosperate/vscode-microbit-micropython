@@ -1,29 +1,25 @@
 /**
- * Reaching the simulator files that ship inside this extension.
- *
- * `vscode.workspace.fs` and never `fetch`, for the same reason `src/hex/assets.ts`
- * uses it: the desktop hands out a `file:` `extensionUri`, which `fetch` refuses.
+ * Reaching the simulator files that ship inside this extension, through
+ * `vscode.workspace.fs` and never `fetch`: the desktop hands out a `file:`
+ * `extensionUri`, which `fetch` refuses.
  */
 import * as vscode from 'vscode';
 
 import { log } from '../log';
-
-/** Everything the document needs at runtime, checked before one is built. */
-const FILES = ['simulator.html', 'build/firmware.js', 'build/simulator.js', 'build/firmware.wasm'];
+import { RUNTIME_FILES } from './protocol';
 
 export const simulatorAssets = (extensionUri: vscode.Uri): vscode.Uri =>
 	vscode.Uri.joinPath(extensionUri, 'assets', 'simulator');
 
 /**
- * Upstream posts `ready` before anything touches the WebAssembly, so a missing
- * file would otherwise show up as a board that boots and fails on the first run.
+ * The stat catches a missing file before a document is built, on desktop. On web
+ * it answers for any URI, and the shell's own fetch of the same list is the check.
  */
 export async function readSimulatorHtml(extensionUri: vscode.Uri): Promise<string> {
 	const assets = simulatorAssets(extensionUri);
-	for (const file of FILES) {
+	for (const file of RUNTIME_FILES) {
 		const uri = vscode.Uri.joinPath(assets, ...file.split('/'));
 		try {
-			// stat rather than read: the wasm alone is 1.2 MB and nothing here needs it.
 			await vscode.workspace.fs.stat(uri);
 		} catch (error) {
 			log(`Could not read ${uri}: ${String(error)}`);

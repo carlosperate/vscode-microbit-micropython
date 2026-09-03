@@ -2,11 +2,9 @@
   <title>micro:bit board</title>
   <!-- The viewBox is the board's own bounding box, so it fills the icon slot
        edge to edge instead of sitting in a square with margins around it. -->
-  <!-- VS Code masks this to the theme colour, so only the alpha survives: one
-       shape, holes cut with fill-rule evenodd, and no colour anywhere. The board
-       is the outline rather than a filled slab because the fringe, the logo and
-       the edge connector are all lighter than the board on the full-colour icon,
-       and a mask has no second tone to say so with. -->
+  <!-- Masked to the theme colour, so only the alpha survives: one evenodd shape,
+       no colour. An outline rather than a slab, since the fringe, logo and edge
+       connector are lighter than the board and a mask has no second tone. -->
   <path fill-rule="evenodd" d="M4.5 3.5A3 3 0 0 0 1.5 6.5v11a3 3 0 0 0 3 3h15a3 3 0 0 0 3-3v-11a3 3 0 0 0-3-3z
   M4.7 4.6A2.1 2.1 0 0 0 2.6 6.7v10.6a2.1 2.1 0 0 0 2.1 2.1h14.6a2.1 2.1 0 0 0 2.1-2.1V6.7a2.1 2.1 0 0 0-2.1-2.1z
   M2.6 9.1V6.7a2.1 2.1 0 0 1 2.1-2.1h2.4z

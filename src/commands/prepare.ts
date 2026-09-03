@@ -7,13 +7,16 @@ import { readFirmware } from '../hex/assets';
 import { buildFor, FirmwareError, StorageFullError, type BoardVersion, type Built } from '../hex/build';
 import { log } from '../log';
 
-/** A hex, what it costs on the device, and where it came from. */
-export interface Prepared extends Built {
+/** The files a target gets, and where they came from. */
+export interface PreparedFiles {
 	folder: vscode.WorkspaceFolder;
 	/** The project folder below it, empty when that is the folder itself. */
 	project: string;
 	files: readonly SelectedFile[];
 }
+
+/** Those files built into a hex, and what it costs on the device. */
+export interface Prepared extends Built, PreparedFiles {}
 
 /**
  * Whether there is a workspace at all. Exported so Flash can ask before it
@@ -23,12 +26,12 @@ export interface Prepared extends Built {
 export function hasSomethingToBuild(): boolean {
 	if (vscode.workspace.workspaceFolders?.length) return true;
 
-	void vscode.window.showWarningMessage(`${PRODUCT}: open a folder first, there is nothing to build.`);
+	void vscode.window.showWarningMessage(`${PRODUCT}: open a folder first, there is nothing to run.`);
 	return false;
 }
 
 /** Omits the common workspace-root case from notifications. */
-export const projectClause = (prepared: Prepared) => (prepared.project ? ` in ${prepared.project}/` : '');
+export const projectClause = (prepared: PreparedFiles) => (prepared.project ? ` in ${prepared.project}/` : '');
 
 /** Long projects would otherwise turn the success toast into a wall of filenames. */
 const NAMES_SHOWN = 6;
@@ -40,17 +43,12 @@ export function listNames(files: readonly { name: string }[]): string {
 }
 
 /**
- * Shared preparation for Flash and Save Hex: resolve, select, and build.
- *
- * `board` is the version to build for when it is known, which is what makes the
- * storage figures that board's own. `undefined` means the command has nothing
- * left to do, and the user has either been told why or dismissed the folder pick
- * and needs no telling.
+ * Shared preparation for every target: resolve the folder, select the files,
+ * and say why not. `undefined` means the command has nothing left to do, and
+ * the user has either been told why or dismissed the folder pick and needs no
+ * telling.
  */
-export async function prepareHex(
-	context: vscode.ExtensionContext,
-	board?: BoardVersion
-): Promise<Prepared | undefined> {
+export async function prepareFiles(context: vscode.ExtensionContext): Promise<PreparedFiles | undefined> {
 	if (!hasSomethingToBuild()) return undefined;
 
 	// Dismissing the pick is an answer, so it passes without a word.
@@ -87,15 +85,29 @@ export async function prepareHex(
 	}
 
 	warnAboutOmissions(context, project.uri, selection);
+	return { folder, project: project.path, files: selection.files };
+}
+
+/**
+ * The files built into a hex, for Flash and Save Hex. `board` is the version to
+ * build for when it is known, which is what makes the storage figures that
+ * board's own.
+ */
+export async function prepareHex(
+	context: vscode.ExtensionContext,
+	board?: BoardVersion
+): Promise<Prepared | undefined> {
+	const prepared = await prepareFiles(context);
+	if (!prepared) return undefined;
 
 	try {
 		const started = Date.now();
-		const built = await buildFor((version) => readFirmware(context.extensionUri, version), board, selection.files);
+		const built = await buildFor((version) => readFirmware(context.extensionUri, version), board, prepared.files);
 		log(
 			`Built a ${board ?? 'universal'} hex of ${built.hex.length} bytes in ${Date.now() - started} ms, ` +
 				`using ${built.used} of ${built.available} bytes of storage`
 		);
-		return { ...built, folder, project: project.path, files: selection.files };
+		return { ...built, ...prepared };
 	} catch (error) {
 		log(`Could not build the hex: ${String(error)}`);
 		void vscode.window.showErrorMessage(`${PRODUCT}: ${explain(error)}`);

@@ -8,7 +8,7 @@ import { showMenu } from './commands/showMenu';
 import { COMMANDS, PRODUCT, type CommandId } from './config';
 import { createLog, log } from './log';
 import { createSerialMonitor } from './serial/eclipse';
-import { openSimulator } from './simulator/commands';
+import { filesForSimulator, openSimulator, runInSimulator } from './simulator/commands';
 import { createSimulator } from './simulator/view';
 
 export type CommandHandler = (context: vscode.ExtensionContext, ...args: unknown[]) => Promise<void>;
@@ -39,12 +39,13 @@ export function activateHost(context: vscode.ExtensionContext, host: Host): Exte
 
 	// The simulator is the one feature that belongs to both hosts, so it is wired
 	// here rather than twice over in the two entry points.
-	const simulator = createSimulator(context);
+	const simulator = createSimulator(context, () => filesForSimulator(context));
 
 	const implemented: Partial<Record<CommandId, CommandHandler>> = {
 		...host.commands,
 		[COMMANDS.showMenu]: (forMenu) => showMenu(forMenu, host.boardAttached?.()),
 		[COMMANDS.openSimulator]: openSimulator(simulator),
+		[COMMANDS.runInSimulator]: runInSimulator(simulator),
 	};
 
 	// Manifest titles keep stub notifications in sync with the command palette.

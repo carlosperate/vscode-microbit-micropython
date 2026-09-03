@@ -56,3 +56,10 @@ body > svg {
 	outline: 1px solid var(--vscode-focusBorder);
 	outline-offset: 2px;
 }
+
+.note {
+	margin: 8px 0 0;
+	color: var(--vscode-descriptionForeground);
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+}

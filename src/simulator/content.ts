@@ -7,9 +7,7 @@
 export interface DocumentUris {
 	/** The folder holding simulator.html. Upstream loads its scripts relative to it. */
 	assets: string;
-	/** Our shell bundle. */
 	script: string;
-	/** `webview.cspSource`. */
 	cspSource: string;
 }
 
@@ -41,9 +39,8 @@ export function simulatorDocument(upstream: string, uris: DocumentUris): string 
 		throw new Error(`simulator.html must have exactly one <head>, found ${opens.length}`);
 	}
 
-	// The base is what makes upstream's relative `build/` scripts and its wasm
-	// fetch resolve; the script is blocking and first, so its prelude runs before
-	// upstream's own scripts.
+	// The base resolves upstream's relative `build/` scripts and its wasm fetch;
+	// the script goes first and blocking so its prelude runs before upstream's.
 	const block = [
 		`<meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy(uris.cspSource)}">`,
 		`<base href="${uris.assets}/">`,

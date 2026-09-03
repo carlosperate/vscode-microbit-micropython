@@ -141,19 +141,24 @@ describe('the status bar menu', () => {
 		{ command: COMMANDS.connect, title: 'Connect' },
 		{ command: COMMANDS.disconnect, title: 'Disconnect' },
 		{ command: COMMANDS.openTerminal, title: 'Open Serial Terminal' },
+		{ command: COMMANDS.openSimulator, title: 'Open Simulator' },
+		{ command: COMMANDS.runInSimulator, title: 'Run in Simulator' },
 	];
 
 	const titles = (connected: boolean | undefined) =>
 		menuCommands(contributed, connected).map((entry) => entry.title);
 
+	/** The two ways to run the program lead, then the simulator on its own, then the rest. */
+	const WORK = ['Flash', 'Run in Simulator', 'Open Simulator', 'Open Serial Terminal', 'Save Hex', 'Select Project Folder'];
+
 	/** Nothing below it works until it has been done, so it leads. */
 	it('puts Connect first while there is no board', () => {
-		expect(titles(false)).toEqual(['Connect', 'Flash', 'Open Serial Terminal', 'Save Hex', 'Select Project Folder']);
+		expect(titles(false)).toEqual(['Connect', ...WORK]);
 	});
 
 	/** It undoes the menu rather than using it, so it trails. */
 	it('puts Disconnect last once there is one', () => {
-		expect(titles(true)).toEqual(['Flash', 'Open Serial Terminal', 'Save Hex', 'Select Project Folder', 'Disconnect']);
+		expect(titles(true)).toEqual([...WORK, 'Disconnect']);
 	});
 
 	/**
@@ -162,7 +167,7 @@ describe('the status bar menu', () => {
 	 * button whose only outcome is an explanation of why it does nothing.
 	 */
 	it('offers neither where no board can be paired', () => {
-		expect(titles(undefined)).toEqual(['Flash', 'Open Serial Terminal', 'Save Hex', 'Select Project Folder']);
+		expect(titles(undefined)).toEqual(WORK);
 	});
 
 	/**
