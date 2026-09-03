@@ -1,9 +1,24 @@
 /* The board SVG carries a viewBox and no size, and there is no frame around it,
-   so without a limit it grows to fill the whole view however tall that is. */
+   so without a limit it grows to fill the whole view however tall that is.
+
+   A column that is exactly the view is what keeps the board on screen: the
+   document itself never scrolls, so the only thing that can scroll is the sensor
+   list, and scrolling it cannot carry the board away. Upstream's play button is
+   `position: absolute` over the board and is not in this flow. */
 body {
 	margin: 0;
 	padding: 8px;
 	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+}
+
+/* Everything above the sensors keeps its own height and gives up none of it. */
+body > svg,
+.controls,
+.note {
+	flex: none;
 }
 
 body > svg {
@@ -62,4 +77,118 @@ body > svg {
 	color: var(--vscode-descriptionForeground);
 	font-family: var(--vscode-font-family);
 	font-size: var(--vscode-font-size);
+}
+
+/* Closed by default, so a pane that fits the board and the strip today still
+   does, and the board stays the first thing in the view. */
+.sensors {
+	margin-top: 10px;
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	color: var(--vscode-foreground);
+	flex: none;
+}
+
+/* Open, it takes what is left and scrolls inside it, rather than growing the
+   document and taking the board off the top of the view. `min-height: 0` is what
+   lets a flex item shrink below its content and scroll at all. */
+.sensors[open] {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.sensors > summary {
+	cursor: pointer;
+	padding: 2px 0;
+	user-select: none;
+}
+
+.sensors > summary:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 2px;
+}
+
+.sensors.disabled {
+	opacity: 0.5;
+}
+
+/* Name above control, so nothing truncates at the sidebar's minimum width. */
+.sensor {
+	display: block;
+	margin-top: 8px;
+}
+
+.sensor-name {
+	display: block;
+	margin-bottom: 2px;
+}
+
+.sensor-value {
+	color: var(--vscode-descriptionForeground);
+}
+
+.sensor input[type='range'] {
+	display: block;
+	width: 100%;
+	margin: 0;
+	accent-color: var(--vscode-button-background);
+}
+
+/* A checkbox reads left of its name, unlike everything else here. */
+.sensor.toggle {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.sensor.toggle .sensor-name {
+	margin-bottom: 0;
+}
+
+.sensor.enum {
+	display: flex;
+	align-items: flex-end;
+	gap: 6px;
+}
+
+.sensor.enum .sensor-name {
+	flex: 1;
+	min-width: 0;
+}
+
+.sensor select {
+	display: block;
+	width: 100%;
+	margin-top: 2px;
+	padding: 2px 4px;
+	border: 1px solid var(--vscode-dropdown-border, transparent);
+	border-radius: 2px;
+	background: var(--vscode-dropdown-background);
+	color: var(--vscode-dropdown-foreground);
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+}
+
+.sensor.enum button {
+	padding: 4px 8px;
+	border: 1px solid var(--vscode-button-border, transparent);
+	border-radius: 2px;
+	background: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
+	color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	cursor: pointer;
+}
+
+.sensor.enum button[disabled] {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.sensor input:focus-visible,
+.sensor select:focus-visible,
+.sensor.enum button:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 2px;
 }

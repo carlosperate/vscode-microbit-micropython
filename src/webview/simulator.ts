@@ -13,6 +13,7 @@ import {
 	type SimulatorMessage,
 	type ToShell,
 } from '../simulator/protocol';
+import { clearValue, sensorControls, setValueFor, withChange, type Control } from '../simulator/sensors';
 import css from './simulator.css';
 
 // Prelude. Runs before upstream's scripts, which is the whole reason this file
@@ -95,6 +96,10 @@ function setTerminalOpen(open: boolean): void {
  */
 function setRunning(running: boolean): void {
 	stop?.toggleAttribute('disabled', !running);
+	// A stopped board has no interpreter to receive a value.
+	for (const field of fields.values()) field.input.toggleAttribute('disabled', !running);
+	for (const send of sendButtons) send.toggleAttribute('disabled', !running);
+	panel?.classList.toggle('disabled', !running);
 }
 
 /** The play button's `request_flash` goes up to the extension, which answers with `files`. */
@@ -103,6 +108,9 @@ function fromSimulator(notification: SimulatorMessage): void {
 		started = true;
 		if (note) note.hidden = true;
 	}
+	// The board's own ranges and choices arrive once, at boot, and nowhere else.
+	if (notification.kind === 'ready') buildSensors(notification.state);
+	if (notification.kind === 'state_change') followProgram(notification.change);
 	// An Error crosses the channel as `{}`, so its message goes instead.
 	if (notification.kind === 'internal_error') {
 		const error = notification.error as { message?: string } | undefined;
@@ -128,6 +136,8 @@ window.addEventListener('DOMContentLoaded', () => {
 	style.textContent = css;
 	document.head.append(style);
 	document.body.append(controls(), loadedNote());
+	// The board boots with the document, so its state can arrive before this runs.
+	if (boardState !== undefined) buildSensors(boardState);
 	send({ kind: 'ready' });
 	flush();
 	void checkAssets();
@@ -202,6 +212,164 @@ function controls(): HTMLElement {
 	strip.append(terminal);
 
 	return strip;
+}
+
+/**
+ * The sensor panel. Built from the board's own `ready` state, so a simulator that
+ * gains a sensor gains a control; what to show is decided in `sensors.ts`, and
+ * this file is only the DOM.
+ */
+let boardState: unknown;
+let sensors: Control[] = [];
+let panel: HTMLElement | undefined;
+const fields = new Map<string, { input: HTMLInputElement | HTMLSelectElement; readout?: HTMLElement }>();
+const sendButtons: HTMLButtonElement[] = [];
+
+function buildSensors(state: unknown): void {
+	boardState = state;
+	// The board's state can arrive before the strip exists, since `body` is there
+	// from the first parsed tag. Building then would put the panel above the strip
+	// and leave it enabled with no board, so it waits for `DOMContentLoaded`, which
+	// builds from what was kept here.
+	if (!note) return;
+	try {
+		sensors = sensorControls(state);
+		fields.clear();
+		sendButtons.length = 0;
+		const built = sensorPanel(sensors);
+		panel ? panel.replaceWith(built) : note.after(built);
+		panel = built;
+		setRunning(!stop?.hasAttribute('disabled'));
+	} catch (error) {
+		// The panel is worth losing; the board is not.
+		send({ kind: 'error', detail: `the sensor panel could not be built: ${String(error)}` });
+	}
+}
+
+/** A change the program made, which must never be posted back to it. */
+function followProgram(change: unknown): void {
+	sensors = withChange(sensors, change);
+	for (const control of sensors) {
+		const field = fields.get(control.id);
+		if (!field) continue;
+		// A checkbox carries its state in `checked`; `value` there is what a form
+		// would submit, and setting it would do nothing at all.
+		if (field.input instanceof HTMLInputElement && field.input.type === 'checkbox') {
+			field.input.checked = control.value === 1;
+		} else {
+			field.input.value = String(control.value);
+		}
+		if (field.readout) field.readout.textContent = readout(control);
+	}
+}
+
+function sensorPanel(list: Control[]): HTMLElement {
+	const details = document.createElement('details');
+	details.className = 'sensors';
+	const summary = document.createElement('summary');
+	summary.textContent = 'Sensors';
+	details.append(summary);
+	if (!list.length) {
+		const empty = document.createElement('p');
+		empty.className = 'note';
+		empty.textContent = 'This simulator reports no sensors.';
+		details.append(empty);
+		return details;
+	}
+	for (const control of list) details.append(row(control));
+	return details;
+}
+
+const readout = (control: Control): string =>
+	control.kind === 'slider' && control.unit ? `${control.value} ${control.unit}` : String(control.value);
+
+/** A label wrapping its own control, so the two are bound with no ids to collide. */
+function row(control: Control): HTMLElement {
+	if (control.kind === 'enum') return enumRow(control);
+
+	const label = document.createElement('label');
+	label.className = 'sensor';
+	const name = document.createElement('span');
+	name.className = 'sensor-name';
+	name.textContent = control.label;
+	label.append(name);
+
+	const input = document.createElement('input');
+	if (control.kind === 'toggle') {
+		label.classList.add('toggle');
+		input.type = 'checkbox';
+		input.checked = control.value === 1;
+		input.addEventListener('change', () => post(control, input.checked ? 1 : 0));
+		label.prepend(input);
+		fields.set(control.id, { input });
+		return label;
+	}
+
+	const value = document.createElement('span');
+	value.className = 'sensor-value';
+	value.textContent = readout(control);
+	name.append(' ', value);
+
+	input.type = 'range';
+	input.min = String(control.min);
+	input.max = String(control.max);
+	// Whole numbers only: upstream `parseInt`s a string value and rejects a
+	// fraction that then reads as a slider that jumps.
+	input.step = '1';
+	input.value = String(control.value);
+	input.addEventListener('input', () => {
+		const sent = post(control, input.value);
+		value.textContent = control.unit ? `${sent} ${control.unit}` : String(sent);
+	});
+	label.append(input);
+	fields.set(control.id, { input, readout: value });
+	return label;
+}
+
+/**
+ * A gesture is an event and not a level: it is sent, then cleared 500 ms later,
+ * or the board reads as being shaken for ever and a second shake never fires.
+ */
+function enumRow(control: Control & { kind: 'enum' }): HTMLElement {
+	const wrapper = document.createElement('div');
+	wrapper.className = 'sensor enum';
+
+	const label = document.createElement('label');
+	label.className = 'sensor-name';
+	label.textContent = control.label;
+	const select = document.createElement('select');
+	for (const choice of control.choices) {
+		const option = document.createElement('option');
+		option.value = choice;
+		option.textContent = choice;
+		option.selected = choice === control.value;
+		select.append(option);
+	}
+	label.append(select);
+	wrapper.append(label);
+
+	const fire = button('Send', () => {
+		post(control, select.value);
+		fire.setAttribute('disabled', '');
+		setTimeout(() => {
+			post(control, clearValue(control));
+			fire.removeAttribute('disabled');
+		}, 500);
+	});
+	sendButtons.push(fire);
+	wrapper.append(fire);
+	fields.set(control.id, { input: select });
+	return wrapper;
+}
+
+/** Our own copy moves with it: the board never echoes a `set_value` back. */
+function post(control: Control, raw: number | string): number | string {
+	const message = setValueFor(control, raw);
+	toSimulator(message);
+	const sent = message.value as number | string;
+	const at = sensors.findIndex((entry) => entry.id === control.id);
+	if (at !== -1) sensors[at] = { ...sensors[at], value: sent } as Control;
+	return sent;
 }
 
 function button(label: string, onClick: () => void): HTMLButtonElement {
