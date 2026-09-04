@@ -5,6 +5,10 @@ serial and REPL, or run your code in the built-in simulator 🐍🤖.
 
 Works on both desktop and web versions of VS Code and compatible editors.
 
+<p align="center">
+  <img src="assets/screenshot.png" alt="Extension screenshot" width="75%" align="center"/>
+</p>
+
 🚧 Extension still under construction. Most features are implemented and should
 be usable, if you find any issues please raise a bug, it'll be very appreciated!
 https://github.com/carlosperate/vscode-microbit-micropython/issues
@@ -22,10 +26,6 @@ https://github.com/carlosperate/vscode-microbit-micropython/issues
 6. To talk to the board, choose **Open Serial Terminal** from the same menu or
   the activity bar on the sidebar.
   Press `Ctrl+C` to interrupt the running program and get a MicroPython prompt.
-
-<p align="center">
-  <img src="assets/screenshot.png" alt="Extension screenshot" width="75%" align="center"/>
-</p>
 
 ## What it does
 

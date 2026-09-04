@@ -3,7 +3,7 @@
 .vscode-test-web/**
 .github/**
 assets/icon.svg
-assets/screenshot.png
+assets/screensho*.*
 src/**
 test/**
 config/**

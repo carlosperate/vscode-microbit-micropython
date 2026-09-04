@@ -2,7 +2,7 @@
   "name": "bbcmicrobit-micropython",
   "displayName": "BBC micro:bit MicroPython",
   "description": "Build and flash a MicroPython project to a BBC micro:bit, and connect to the device serial and REPL.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "carlosperate",
   "license": "MIT",
   "icon": "assets/icon.png",

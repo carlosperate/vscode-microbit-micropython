@@ -1,6 +1,6 @@
 # Release Notes
 
-## v0.2.0 - Unreleased
+## v0.2.0 - 2026/09/04
 
 - Added a micro:bit simulator, so code can be run there.
   It appears in the side bar on the micro:bit icon.
