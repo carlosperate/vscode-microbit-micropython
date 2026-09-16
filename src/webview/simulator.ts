@@ -14,6 +14,7 @@ import {
 	type ToShell,
 } from '../simulator/protocol';
 import { clearValue, sensorControls, setValueFor, withChange, type Control } from '../simulator/sensors';
+import { icon, TERMINAL, ZAP } from './icons';
 import css from './simulator.css';
 
 // Prelude. Runs before upstream's scripts, which is the whole reason this file
@@ -86,7 +87,7 @@ let terminalOpen = false;
 function setTerminalOpen(open: boolean): void {
 	terminalOpen = open;
 	terminal?.toggleAttribute('disabled', open);
-	if (terminal) terminal.title = open ? 'A serial terminal is already open.' : 'Open a serial terminal on the board.';
+	if (terminal) terminal.title = open ? 'A simulator terminal is already open.' : 'Open a serial terminal on the simulator.';
 }
 
 /**
@@ -135,6 +136,8 @@ window.addEventListener('DOMContentLoaded', () => {
 	const style = document.createElement('style');
 	style.textContent = css;
 	document.head.append(style);
+	stage();
+	document.body.prepend(boardRow(), divider());
 	document.body.append(controls(), loadedNote());
 	// The board boots with the document, so its state can arrive before this runs.
 	if (boardState !== undefined) buildSensors(boardState);
@@ -160,6 +163,52 @@ async function checkAssets(): Promise<void> {
 		}
 		return;
 	}
+}
+
+/**
+ * The board and its play button in one positioned box. Upstream places the
+ * button absolutely over the whole document, so without the box anything above
+ * the board pushes the board out from under it.
+ */
+function stage(): void {
+	const board = document.querySelector('body > svg');
+	const play = document.querySelector('.play-button-container');
+	if (!board || !play) {
+		// Without the box nothing sizes the board, so say so rather than let it grow unbounded.
+		send({ kind: 'error', detail: 'the board or its play button was not in the document when the shell built it' });
+		return;
+	}
+	const box = document.createElement('div');
+	box.className = 'stage';
+	board.before(box);
+	box.append(board, play);
+}
+
+/** The real board's buttons lead: they are what a MicroPython user came for. */
+function boardRow(): HTMLElement {
+	const row = document.createElement('div');
+	row.className = 'board';
+	row.setAttribute('role', 'group');
+	row.setAttribute('aria-label', 'micro:bit');
+	const flash = button('Flash Project', () => send({ kind: 'control', control: 'flash' }));
+	flash.title = 'Build a MicroPython hex from the project folder and flash it to a connected micro:bit.';
+	flash.prepend(icon(ZAP));
+	const serial = button('Serial Terminal', () => send({ kind: 'control', control: 'serial' }));
+	serial.title = 'Open a serial terminal on a connected micro:bit.';
+	serial.prepend(icon(TERMINAL));
+	row.append(flash, serial);
+	return row;
+}
+
+/** Between the real board's buttons and the simulated board, saying which is which. */
+function divider(): HTMLElement {
+	const rule = document.createElement('div');
+	rule.className = 'divider';
+	rule.setAttribute('role', 'separator');
+	const label = document.createElement('span');
+	label.textContent = 'Simulator';
+	rule.append(label);
+	return rule;
 }
 
 /** Run in Simulator on a board that has never started must not look like nothing happened. */

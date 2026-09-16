@@ -4,12 +4,14 @@
  */
 import * as vscode from 'vscode';
 
-import { COMMANDS, PRODUCT } from '../config';
+import { MODE_ID, PRODUCT } from '../config';
 import { log } from '../log';
+import type { ManagerLink } from '../manager/link';
 import type { SerialTransport } from '../serial/types';
 import { readSimulatorHtml, simulatorAssets } from './assets';
 import { SimulatorTransport, type SimulatorLink } from './connection';
 import { simulatorDocument } from './content';
+import { commandFor } from './controls';
 import type { EncodedFile, FromShell, SimulatorMessage, ToShell } from './protocol';
 import { ReadyGate, type Readiness } from './ready';
 
@@ -40,7 +42,11 @@ export type ProvideFiles = () => Promise<EncodedFile[] | undefined>;
  * singleton survives `deactivate()`, so a second activation in the same host,
  * which is what the integration tests do, would inherit the first one's view.
  */
-export function createSimulator(context: vscode.ExtensionContext, provideFiles: ProvideFiles): Simulator {
+export function createSimulator(
+	context: vscode.ExtensionContext,
+	provideFiles: ProvideFiles,
+	manager: ManagerLink
+): Simulator {
 	let current: vscode.WebviewView | undefined;
 	const gate = new ReadyGate();
 
@@ -108,15 +114,19 @@ export function createSimulator(context: vscode.ExtensionContext, provideFiles: 
 			case 'error':
 				log(`Simulator error: ${message.detail}`);
 				return;
-			case 'control':
+			case 'control': {
 				log(`Simulator: ${message.control} pressed`);
-				// The strip's button runs the same command as the palette, so the two cannot drift.
-				if (message.control === 'terminal') {
+				// The document's buttons run the same commands as the palette, so the two cannot drift.
+				const command = commandFor(message.control, () => manager.api()?.commands.openTerminal);
+				if (command) {
 					void vscode.commands
-						.executeCommand(COMMANDS.openSimulatorTerminal)
-						.then(undefined, (error: unknown) => log(`Simulator: the terminal button failed: ${String(error)}`));
+						.executeCommand(command)
+						.then(undefined, (error: unknown) =>
+							log(`Simulator: the ${message.control} button failed: ${String(error)}`)
+						);
 				}
 				return;
+			}
 			case 'notification':
 				logNotification(message.notification);
 				if (message.notification.kind === 'request_flash') void sendFiles(webview);
@@ -168,6 +178,12 @@ export function createSimulator(context: vscode.ExtensionContext, provideFiles: 
 	context.subscriptions.push(registration);
 
 	async function show(): Promise<void> {
+		// The view is gated on this being the active mode, and a gated-out view
+		// cannot be revealed, so a simulator command is the user asking for MicroPython.
+		if (manager.status.registered) {
+			const api = manager.api();
+			if (api && api.activeMode() !== MODE_ID) await vscode.commands.executeCommand(api.commands.switchMode, MODE_ID);
+		}
 		// `<viewId>.focus` is VS Code's own, and the only way to reveal a view
 		// that has never been resolved and so has no `show()` to call.
 		if (!current) {

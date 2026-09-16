@@ -7,20 +7,15 @@ export const COMMANDS = {
 	flash: 'bbcmicrobit-micropython.flash',
 	saveHex: 'bbcmicrobit-micropython.saveHex',
 	selectProjectFolder: 'bbcmicrobit-micropython.selectProjectFolder',
-	connect: 'bbcmicrobit-micropython.connect',
-	disconnect: 'bbcmicrobit-micropython.disconnect',
-	openTerminal: 'bbcmicrobit-micropython.openTerminal',
 	openSimulator: 'bbcmicrobit-micropython.openSimulator',
 	runInSimulator: 'bbcmicrobit-micropython.runInSimulator',
 	openSimulatorTerminal: 'bbcmicrobit-micropython.openSimulatorTerminal',
-	/**
-	 * Opens a menu of the palette's own entries, so it is hidden from the palette
-	 * and from that menu; contributed only for the icon in the device section's header.
-	 */
-	showMenu: 'bbcmicrobit-micropython.showMenu',
 } as const;
 
 export type CommandId = (typeof COMMANDS)[keyof typeof COMMANDS];
+
+/** This extension's own id, which is what it registers its mode under. */
+export const EXTENSION_ID = 'carlosperate.bbcmicrobit-micropython';
 
 /** The settings section, and the keys inside it, as the manifest declares them. */
 export const SECTION = 'bbcmicrobit-micropython';
@@ -38,16 +33,32 @@ export const settingId = (key: (typeof SETTINGS)[keyof typeof SETTINGS]) => `${S
  */
 export const PRODUCT = 'BBC micro:bit MicroPython';
 
-/** The Open VSX companion that owns every serial terminal. */
+/** The Open VSX companion that owns every terminal, which here is the simulator's REPL. */
 export const SERIAL_MONITOR_EXTENSION = 'eclipse-cdt.serial-monitor';
 
 /**
- * Set once this host is known to be able to authorise a board, and read by the
- * manifest to keep Connect and Disconnect out of the palette where it cannot.
- * A capability and not a host: a web workbench that stopped bridging the device
- * chooser would hide them too, which is the right answer there as well.
+ * The extension that owns the board, the shared `BBC micro:bit` panel and the
+ * mode switcher. This one builds a hex and hands it over; every byte that
+ * reaches a board goes through there.
  */
-export const CAN_PAIR_CONTEXT = 'bbcmicrobit-micropython.canPair';
+export const MANAGER_EXTENSION = 'carlosperate.bbcmicrobit-manager';
 
-/** The device section: welcome content over a tree that stays empty. */
-export const DEVICE_VIEW_ID = 'bbcmicrobit-micropython.device';
+/** The lowest manager API this extension works against, as the types package versions it. */
+export const MANAGER_API_VERSION = '0.2.0';
+
+/** The mode this extension registers, and the segment label a user reads. */
+export const MODE_ID = 'micropython';
+export const MODE_LABEL = 'MicroPython';
+
+/** Set when the manager refused this extension, so the simulator can still show where the panel would be bare. */
+export const REFUSED_CONTEXT = 'bbcmicrobit-micropython.refused';
+
+/**
+ * What gates the one view here: the manager naming this the active mode, or,
+ * refused and with nothing else registered, the panel that would otherwise hold
+ * only the manager's board buttons. The simulator needs no board.
+ */
+export const MODE_WHEN = `bbcmicrobit-manager.activeMode == ${MODE_ID} || (${REFUSED_CONTEXT} && bbcmicrobit-manager.noModes)`;
+
+/** The shared activity bar container the manager declares. Never declared here. */
+export const CONTAINER_ID = 'bbcmicrobit';

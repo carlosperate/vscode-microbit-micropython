@@ -14,26 +14,26 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/node && tsc --noEmit -p src/webview && tsc --noEmit -p test",
     "test": "vitest run --config config/vitest.config.mts",
     "test:watch": "vitest --config config/vitest.config.mts",
-    "test:integration": "npm run build && npm run build:integration && vscode-test-web --quality stable --headless --extensionDevelopmentPath=. --extensionTestsPath=./test/integration/dist/index.js ./test/workspace",
-    "test:integration:desktop": "npm run build && npm run build:integration && node config/desktop.mjs --test",
-    "serve": "npm run build && vscode-test-web --quality stable --browser=none --port=3000 --extensionDevelopmentPath=. ./test/workspace",
+    "test:integration": "npm run build && npm run build:integration && vscode-test-web --quality stable --headless --extensionDevelopmentPath=. --extensionPath=../vscode-microbit-manager --extensionTestsPath=./test/integration/dist/index.js ./test/workspace",
+    "test:integration:desktop": "npm run build && npm run build:integration && node config/desktop.mjs --test --extension=../vscode-microbit-manager",
+    "test:all": "npm run typecheck && npm run build && npm test && npm run test:integration && npm run test:integration:desktop",
+    "serve": "npm run build && vscode-test-web --quality stable --browser=none --port=3000 --extensionDevelopmentPath=. --extensionPath=../vscode-microbit-manager ./test/workspace",
     "serve:extra-extensions": "npm run serve -- --extensionId=eclipse-cdt.serial-monitor --extensionId=carlosperate.micropython-lsp",
-    "chrome": "npm run build && vscode-test-web --quality stable --browser=chromium --extensionDevelopmentPath=. ./test/workspace",
+    "chrome": "npm run build && vscode-test-web --quality stable --browser=chromium --extensionDevelopmentPath=. --extensionPath=../vscode-microbit-manager ./test/workspace",
     "chrome:extra-extensions": "npm run chrome -- --extensionId=eclipse-cdt.serial-monitor --extensionId=carlosperate.micropython-lsp",
-    "desktop": "npm run build && node config/desktop.mjs",
+    "desktop": "npm run build && node config/desktop.mjs --extension=../vscode-microbit-manager",
     "desktop:extra-extensions": "npm run desktop -- --extra-extensions"
   },
   "dependencies": {
-    "@microbit/microbit-connection": "1.0.0",
     "@microbit/microbit-fs": "0.10.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
     "@types/vscode": "1.91.0",
     "@types/w3c-web-serial": "^1.0.8",
-    "@types/w3c-web-usb": "1.0.14",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/test-web": "^0.0.81",
+    "bbcmicrobit-manager-api": "file:../vscode-microbit-manager/api",
     "esbuild": "^0.28.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11"
@@ -45,6 +45,9 @@
   "main": "./dist/node.js",
   "extensionKind": [
     "ui"
+  ],
+  "extensionDependencies": [
+    "carlosperate.bbcmicrobit-manager"
   ],
   "extensionPack": [
     "eclipse-cdt.serial-monitor",
@@ -98,7 +101,7 @@
     "commands": [
       {
         "command": "bbcmicrobit-micropython.flash",
-        "title": "Flash",
+        "title": "Flash Project",
         "category": "BBC micro:bit MicroPython"
       },
       {
@@ -109,21 +112,6 @@
       {
         "command": "bbcmicrobit-micropython.selectProjectFolder",
         "title": "Select Project Folder",
-        "category": "BBC micro:bit MicroPython"
-      },
-      {
-        "command": "bbcmicrobit-micropython.connect",
-        "title": "Connect",
-        "category": "BBC micro:bit MicroPython"
-      },
-      {
-        "command": "bbcmicrobit-micropython.disconnect",
-        "title": "Disconnect",
-        "category": "BBC micro:bit MicroPython"
-      },
-      {
-        "command": "bbcmicrobit-micropython.openTerminal",
-        "title": "Open Serial Terminal",
         "category": "BBC micro:bit MicroPython"
       },
       {
@@ -140,66 +128,16 @@
         "command": "bbcmicrobit-micropython.openSimulatorTerminal",
         "title": "Open Simulator Terminal",
         "category": "BBC micro:bit MicroPython"
-      },
-      {
-        "command": "bbcmicrobit-micropython.showMenu",
-        "title": "See All Options",
-        "category": "BBC micro:bit MicroPython",
-        "icon": "$(ellipsis)"
       }
     ],
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "bbcmicrobit-micropython",
-          "title": "BBC micro:bit MicroPython",
-          "icon": "assets/activitybar.svg"
-        }
-      ]
-    },
     "views": {
-      "bbcmicrobit-micropython": [
-        {
-          "id": "bbcmicrobit-micropython.device",
-          "name": "Device",
-          "icon": "assets/activitybar.svg",
-          "initialSize": 1
-        },
+      "bbcmicrobit": [
         {
           "id": "bbcmicrobit-micropython.simulator",
-          "name": "Simulator",
+          "name": "MicroPython",
           "type": "webview",
           "icon": "assets/activitybar.svg",
-          "initialSize": 9
-        }
-      ]
-    },
-    "viewsWelcome": [
-      {
-        "view": "bbcmicrobit-micropython.device",
-        "contents": "[$(zap) Flash](command:bbcmicrobit-micropython.flash)\n[$(terminal) Serial Terminal](command:bbcmicrobit-micropython.openTerminal)"
-      }
-    ],
-    "menus": {
-      "commandPalette": [
-        {
-          "command": "bbcmicrobit-micropython.connect",
-          "when": "bbcmicrobit-micropython.canPair"
-        },
-        {
-          "command": "bbcmicrobit-micropython.disconnect",
-          "when": "bbcmicrobit-micropython.canPair"
-        },
-        {
-          "command": "bbcmicrobit-micropython.showMenu",
-          "when": "false"
-        }
-      ],
-      "view/title": [
-        {
-          "command": "bbcmicrobit-micropython.showMenu",
-          "when": "view == bbcmicrobit-micropython.device",
-          "group": "navigation"
+          "when": "bbcmicrobit-manager.activeMode == micropython || (bbcmicrobit-micropython.refused && bbcmicrobit-manager.noModes)"
         }
       ]
     }

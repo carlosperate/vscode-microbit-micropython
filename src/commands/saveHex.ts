@@ -1,61 +1,26 @@
-import * as vscode from 'vscode';
+import type * as vscode from 'vscode';
 
-import { PRODUCT } from '../config';
-import { hexFilename } from '../filename';
 import { log } from '../log';
+import type { ManagerLink } from '../manager/link';
 import { prepareHex, projectClause } from './prepare';
 
 /**
- * A hex on disk, which is the whole product wherever a board cannot be paired:
- * Firefox, Safari, and desktop VS Code. No board, no USB, nothing to ask
- * permission for.
- *
- * `showSaveDialog` is the one mechanism, on every host: a native panel on the
- * desktop, and VS Code's own quick-pick dialog in a browser, which writes
- * through `workspace.fs` to a workspace backed entirely by virtual providers.
+ * A hex on disk, which is the whole product wherever a board cannot be reached:
+ * Firefox, Safari, a desktop with nothing plugged in. Built here for every
+ * board, since nothing says which one it will land on, and saved by the
+ * manager, which owns the one copy of the naming rules and the dialog.
  */
-export async function saveHex(context: vscode.ExtensionContext): Promise<void> {
-	const prepared = await prepareHex(context);
-	if (!prepared) return;
+export const saveHex =
+	(manager: ManagerLink) =>
+	async (context: vscode.ExtensionContext): Promise<void> => {
+		const api = manager.api();
+		if (!api) return;
 
-	const { uri, name } = prepared.folder;
-	const target = await vscode.window.showSaveDialog({
-		defaultUri: vscode.Uri.joinPath(uri, hexFilename(name)),
-		saveLabel: 'Save Hex',
-		filters: { 'micro:bit hex': ['hex'] },
-	});
+		const prepared = await prepareHex(context);
+		if (!prepared) return;
 
-	// Silent to the user, logged so it can be told from a save that broke.
-	if (!target) {
-		log('The save was dismissed, and nothing was written');
-		return;
-	}
-
-	// A path where there is one, and the whole URI where the scheme is the clue.
-	const where = target.scheme === 'file' ? target.fsPath : target.toString();
-
-	try {
-		await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(prepared.hex));
-	} catch (error) {
-		// A `FileSystemError` repeats its name and path, burying the readable part.
-		log(`Could not write ${target}: ${String(error)}`);
-		void vscode.window.showErrorMessage(`${PRODUCT}: the hex could not be written to ${where}. Try somewhere else.`);
-		return;
-	}
-
-	log(`Saved to ${where}`);
-	void vscode.window.showInformationMessage(
-		`${PRODUCT}: saved the code${projectClause(prepared)} to ${where}. ${nextStep(target)}`
-	);
-}
-
-/**
- * A browser workspace is virtual, so the file just written is somewhere the
- * operating system cannot see and cannot copy to a board. VS Code's own Explorer
- * download is what gets it out, and saying so is the difference between a file a
- * learner can use and one they can only look at.
- */
-const nextStep = (uri: vscode.Uri) =>
-	uri.scheme === 'file'
-		? 'Drag it onto the MICROBIT drive to run it on the board.'
-		: 'Right-click it in the Explorer to download it, then drag it onto the MICROBIT drive.';
+		// The manager reports the save, or its dismissal, in its own words.
+		if (await api.saveHex(prepared.hex, prepared.folder.name)) {
+			log(`Saved ${prepared.files.length} file(s)${projectClause(prepared)} as a hex for every micro:bit`);
+		}
+	};

@@ -67,7 +67,7 @@ export function getBuildOptions(outDir = root) {
 			external: [],
 			// The stylesheet arrives as a string and is injected as one <style>, so
 			// our whole contribution to upstream's page stays a single tag.
-			loader: { '.css': 'text' },
+			loader: { '.css': 'text', '.svg': 'text' },
 		},
 	];
 }

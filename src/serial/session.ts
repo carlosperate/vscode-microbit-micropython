@@ -1,12 +1,12 @@
-import type { SerialFilter, SerialMonitorApi, SerialPortLike } from './types';
+import type { SerialMonitorApi, SerialPortLike } from './types';
 
-export type SerialSessionKey = 'webusb' | 'webserial' | 'simulator';
+/** Names one terminal. Only the simulator's today; the key stays so a second kind could sit beside it without either forgetting the other's handle. */
+export type SerialSessionKey = string;
 
 /**
  * Owns the opaque handles Eclipse returns without reaching into its terminal
- * map. One per key, not one in all: a board and the simulator are open at once,
- * and a single slot would forget the board's terminal and open a third. An open
- * in flight is shared, so two clicks before Eclipse answers still make one terminal.
+ * map. An open in flight is shared, so two clicks before Eclipse answers still
+ * make one terminal.
  */
 export class SerialSession {
 	private readonly handles = new Map<SerialSessionKey, string>();
@@ -15,14 +15,14 @@ export class SerialSession {
 	public open(
 		api: SerialMonitorApi,
 		key: SerialSessionKey,
-		portOrFilter?: SerialPortLike | SerialFilter,
+		port?: SerialPortLike,
 		options?: SerialOptions,
 		name?: string
 	): Promise<boolean> {
 		const inFlight = this.opening.get(key);
 		if (inFlight) return inFlight;
 
-		const opening = this.revealOrOpen(api, key, portOrFilter, options, name).finally(() => this.opening.delete(key));
+		const opening = this.revealOrOpen(api, key, port, options, name).finally(() => this.opening.delete(key));
 		this.opening.set(key, opening);
 		return opening;
 	}
@@ -30,7 +30,7 @@ export class SerialSession {
 	private async revealOrOpen(
 		api: SerialMonitorApi,
 		key: SerialSessionKey,
-		portOrFilter?: SerialPortLike | SerialFilter,
+		port?: SerialPortLike,
 		options?: SerialOptions,
 		name?: string
 	): Promise<boolean> {
@@ -38,7 +38,7 @@ export class SerialSession {
 		if (existing !== undefined && (await api.revealSerial(existing))) return true;
 
 		this.handles.delete(key);
-		const handle = await api.openSerial(portOrFilter, options, name);
+		const handle = await api.openSerial(port, options, name);
 		if (handle) this.handles.set(key, handle);
 		return handle !== undefined;
 	}

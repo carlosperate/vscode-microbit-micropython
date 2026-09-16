@@ -18,12 +18,8 @@ export interface PreparedFiles {
 /** Those files built into a hex, and what it costs on the device. */
 export interface Prepared extends Built, PreparedFiles {}
 
-/**
- * Whether there is a workspace at all. Exported so Flash can ask before it
- * connects: reaching this check afterwards means opening a device chooser and
- * pairing a board, only to say there was nothing to send it.
- */
-export function hasSomethingToBuild(): boolean {
+/** Whether there is a workspace at all. */
+function hasSomethingToBuild(): boolean {
 	if (vscode.workspace.workspaceFolders?.length) return true;
 
 	void vscode.window.showWarningMessage(`${PRODUCT}: open a folder first, there is nothing to run.`);
@@ -88,18 +84,23 @@ export async function prepareFiles(context: vscode.ExtensionContext): Promise<Pr
 	return { folder, project: project.path, files: selection.files };
 }
 
-/**
- * The files built into a hex, for Flash and Save Hex. `board` is the version to
- * build for when it is known, which is what makes the storage figures that
- * board's own.
- */
-export async function prepareHex(
-	context: vscode.ExtensionContext,
-	board?: BoardVersion
-): Promise<Prepared | undefined> {
+/** The files built into a hex for every board, which is what Save Hex ships. */
+export async function prepareHex(context: vscode.ExtensionContext): Promise<Prepared | undefined> {
 	const prepared = await prepareFiles(context);
 	if (!prepared) return undefined;
+	return buildHex(context, prepared);
+}
 
+/**
+ * `board` is the version to build for when it is known, which is what makes the
+ * storage figures that board's own. Flash learns it from the manager after the
+ * files are selected, so a folder with nothing to send never costs a chooser.
+ */
+export async function buildHex(
+	context: vscode.ExtensionContext,
+	prepared: PreparedFiles,
+	board?: BoardVersion
+): Promise<Prepared | undefined> {
 	try {
 		const started = Date.now();
 		const built = await buildFor((version) => readFirmware(context.extensionUri, version), board, prepared.files);

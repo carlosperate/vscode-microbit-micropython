@@ -26,8 +26,8 @@ export interface PortDescription {
 
 /**
  * Adapts a transport's string events to the byte streams Eclipse consumes. It
- * takes the port's identity rather than knowing any device: the same adapter
- * serves a WebUSB board and the simulator, and the desktop bundle carries it.
+ * takes the port's identity rather than knowing any device: the simulator is the
+ * one transport today, and the adapter would serve another without change.
  */
 export class TransportSerialPort implements SerialPortLike {
 	public readable: ReadableStream<Uint8Array> | null = null;

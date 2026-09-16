@@ -1,13 +1,9 @@
 import * as vscode from 'vscode';
 
 import { SERIAL_MONITOR_EXTENSION } from '../config';
-import { loadSerialMonitor, SerialMonitorError } from './provider';
+import { loadSerialMonitor } from './provider';
 import { SerialSession, type SerialSessionKey } from './session';
-import type { SerialFilter, SerialMonitorApi, SerialPortLike } from './types';
-
-export { SerialMonitorError } from './provider';
-
-const OPEN_SERIAL_COMMAND = 'serial-monitor.openSerial';
+import type { SerialMonitorApi, SerialPortLike } from './types';
 
 const session = new SerialSession();
 
@@ -17,21 +13,14 @@ export function createSerialMonitor(context: vscode.ExtensionContext): void {
 	});
 }
 
+/** A terminal on a port of ours, through the companion that owns every terminal. */
 export async function openEclipseSerial(
 	key: SerialSessionKey,
-	portOrFilter?: SerialPortLike | SerialFilter,
-	options?: SerialOptions,
-	name?: string
+	port: SerialPortLike,
+	options: SerialOptions,
+	name: string
 ): Promise<boolean> {
-	return session.open(await serialMonitorApi(), key, portOrFilter, options, name);
-}
-
-export async function openNativeSerial(commands: readonly string[]): Promise<boolean> {
-	if (!commands.includes(OPEN_SERIAL_COMMAND)) {
-		throw new SerialMonitorError('Install or enable the Eclipse Serial Monitor extension.');
-	}
-
-	return (await vscode.commands.executeCommand<string | undefined>(OPEN_SERIAL_COMMAND)) !== undefined;
+	return session.open(await serialMonitorApi(), key, port, options, name);
 }
 
 async function serialMonitorApi(): Promise<SerialMonitorApi> {

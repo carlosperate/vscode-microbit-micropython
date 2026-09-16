@@ -13,7 +13,7 @@
 	"extends": "../../tsconfig.json",
 	"compilerOptions": {
 		"lib": ["ES2020"],
-		"types": ["vscode", "node", "w3c-web-serial", "w3c-web-usb"]
+		"types": ["vscode", "node", "w3c-web-serial"]
 	},
 	// The root's `exclude` is this very folder, and it is inherited, so it has to
 	// be replaced rather than extended.

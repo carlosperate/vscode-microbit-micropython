@@ -1,6 +1,6 @@
 /**
- * The simulator's serial port as a transport, so the same adapter that makes a
- * WebUSB board an Eclipse terminal makes the simulator one. Pure: the view lends
+ * The simulator's serial port as a transport, so the adapter that turns a
+ * transport into an Eclipse terminal serves the simulator. Pure: the view lends
  * it the shell's messages and a way to post, and it imports nothing of VS Code.
  */
 import type { SerialTransport } from '../serial/types';

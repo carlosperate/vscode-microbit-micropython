@@ -19,8 +19,8 @@ beforeEach(() => {
 describe('Eclipse terminal handles', () => {
 	it('reveals an existing terminal instead of opening a duplicate', async () => {
 		const monitor = api();
-		await session.open(monitor, 'webusb');
-		await session.open(monitor, 'webusb');
+		await session.open(monitor, 'simulator');
+		await session.open(monitor, 'simulator');
 
 		expect(monitor.openSerial).toHaveBeenCalledOnce();
 		expect(monitor.revealSerial).toHaveBeenCalledWith('handle-1');
@@ -31,50 +31,49 @@ describe('Eclipse terminal handles', () => {
 		vi.mocked(monitor.revealSerial).mockResolvedValue(false);
 		vi.mocked(monitor.openSerial).mockResolvedValueOnce('old').mockResolvedValueOnce('new');
 
-		await session.open(monitor, 'webusb');
-		await expect(session.open(monitor, 'webusb')).resolves.toBe(true);
+		await session.open(monitor, 'simulator');
+		await expect(session.open(monitor, 'simulator')).resolves.toBe(true);
 		expect(monitor.openSerial).toHaveBeenCalledTimes(2);
 	});
 
 	it('does not reveal a handle opened for a different transport', async () => {
 		const monitor = api();
-		vi.mocked(monitor.openSerial).mockResolvedValueOnce('webusb-handle').mockResolvedValueOnce('webserial-handle');
+		vi.mocked(monitor.openSerial).mockResolvedValueOnce('simulator-handle').mockResolvedValueOnce('other-handle');
 
-		await session.open(monitor, 'webusb');
-		await expect(session.open(monitor, 'webserial')).resolves.toBe(true);
+		await session.open(monitor, 'simulator');
+		await expect(session.open(monitor, 'other')).resolves.toBe(true);
 		expect(monitor.revealSerial).not.toHaveBeenCalled();
 		expect(monitor.openSerial).toHaveBeenCalledTimes(2);
 	});
 
-	/** A board and the simulator are two devices, so each gets its own terminal. */
-	it('opens a second terminal for the simulator beside the board’s', async () => {
+	/** Two keys are two terminals: a second kind would sit beside the simulator's without either forgetting its handle. */
+	it('opens a second terminal under another key beside the simulator’s', async () => {
 		const monitor = api();
-		vi.mocked(monitor.openSerial).mockResolvedValueOnce('board').mockResolvedValueOnce('simulator');
+		vi.mocked(monitor.openSerial).mockResolvedValueOnce('simulator-handle').mockResolvedValueOnce('other-handle');
 
-		await session.open(monitor, 'webusb');
-		await expect(session.open(monitor, 'simulator')).resolves.toBe(true);
+		await session.open(monitor, 'simulator');
+		await expect(session.open(monitor, 'other')).resolves.toBe(true);
 		expect(monitor.revealSerial).not.toHaveBeenCalled();
 		expect(monitor.openSerial).toHaveBeenCalledTimes(2);
 
 		await session.open(monitor, 'simulator');
-		expect(monitor.revealSerial).toHaveBeenCalledExactlyOnceWith('simulator');
+		expect(monitor.revealSerial).toHaveBeenCalledExactlyOnceWith('simulator-handle');
 		expect(monitor.openSerial).toHaveBeenCalledTimes(2);
 	});
 
 	/**
-	 * The case a single slot gets wrong: opening the simulator's terminal made it
-	 * forget the board's, so asking for the board again opened a third terminal and
-	 * orphaned the first.
+	 * The case a single slot gets wrong: opening a second terminal made it forget
+	 * the first, so asking for the first again opened a third and orphaned it.
 	 */
-	it('reveals the board’s terminal again after the simulator’s was opened', async () => {
+	it('reveals the first terminal again after a second was opened', async () => {
 		const monitor = api();
-		vi.mocked(monitor.openSerial).mockResolvedValueOnce('board').mockResolvedValueOnce('simulator');
+		vi.mocked(monitor.openSerial).mockResolvedValueOnce('simulator-handle').mockResolvedValueOnce('other-handle');
 
-		await session.open(monitor, 'webusb');
 		await session.open(monitor, 'simulator');
-		await expect(session.open(monitor, 'webusb')).resolves.toBe(true);
+		await session.open(monitor, 'other');
+		await expect(session.open(monitor, 'simulator')).resolves.toBe(true);
 
-		expect(monitor.revealSerial).toHaveBeenCalledExactlyOnceWith('board');
+		expect(monitor.revealSerial).toHaveBeenCalledExactlyOnceWith('simulator-handle');
 		expect(monitor.openSerial).toHaveBeenCalledTimes(2);
 	});
 
@@ -98,11 +97,11 @@ describe('Eclipse terminal handles', () => {
 		expect(monitor.openSerial).toHaveBeenCalledOnce();
 	});
 
-	it('does not make the board wait for the simulator, or the other way round', async () => {
+	it('does not make one key wait for another', async () => {
 		const monitor = api();
-		vi.mocked(monitor.openSerial).mockResolvedValueOnce('board').mockResolvedValueOnce('simulator');
+		vi.mocked(monitor.openSerial).mockResolvedValueOnce('simulator-handle').mockResolvedValueOnce('other-handle');
 
-		await expect(Promise.all([session.open(monitor, 'webusb'), session.open(monitor, 'simulator')])).resolves.toEqual([
+		await expect(Promise.all([session.open(monitor, 'simulator'), session.open(monitor, 'other')])).resolves.toEqual([
 			true,
 			true,
 		]);
@@ -120,9 +119,9 @@ describe('Eclipse terminal handles', () => {
 
 	it('forgets the handle on disposal without closing Eclipse internals', async () => {
 		const monitor = api();
-		await session.open(monitor, 'webusb');
+		await session.open(monitor, 'simulator');
 		session.dispose();
-		await session.open(monitor, 'webusb');
+		await session.open(monitor, 'simulator');
 
 		expect(monitor.openSerial).toHaveBeenCalledTimes(2);
 		expect(monitor.revealSerial).not.toHaveBeenCalled();

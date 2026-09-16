@@ -26,13 +26,21 @@ export type ToShell =
 	| { kind: 'terminal'; open: boolean };
 
 /**
+ * The document's buttons. `flash` and `serial` are the real board's and run
+ * through the manager; `terminal` is the simulator's REPL; the rest never leave
+ * the document and are reported so the extension can log them.
+ */
+export const SHELL_CONTROLS = ['stop', 'reset', 'sound', 'terminal', 'flash', 'serial'] as const;
+export type ShellControl = (typeof SHELL_CONTROLS)[number];
+
+/**
  * Shell to extension host. `failed` means the document cannot run and only the
  * firmware check sends it; `error` is anything else uncaught, and is logged.
  */
 export type FromShell =
 	| { kind: 'ready' }
 	| { kind: 'notification'; notification: SimulatorMessage }
-	| { kind: 'control'; control: 'stop' | 'reset' | 'sound' | 'terminal'; on?: boolean }
+	| { kind: 'control'; control: ShellControl; on?: boolean }
 	| { kind: 'failed'; detail: string }
 	| { kind: 'error'; detail: string };
 

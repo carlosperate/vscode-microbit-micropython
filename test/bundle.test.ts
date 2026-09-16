@@ -52,21 +52,12 @@ it('leaves vscode external in the browser bundle and pulls in nothing else at ru
 });
 
 /**
- * Node builtins are the point of this entry, so what is pinned is which ones.
- * Anything new here is a dependency arriving at the desktop host, and the list
- * is short enough that adding to it should be a decision rather than a diff.
- *
- * `child_process` is the one to think twice about: it is here to ask Windows for
- * its volume names, and nothing else may reach for it.
+ * The board belongs to the manager extension, drive search included, so nothing
+ * here needs a node builtin any more. Anything appearing is a dependency
+ * arriving at the desktop host, and should be a decision rather than a diff.
  */
-it('reaches for vscode and four node builtins in the node bundle, and nothing else', () => {
-	expect(required(node).sort()).toEqual([
-		'node:child_process',
-		'node:fs/promises',
-		'node:os',
-		'node:util',
-		'vscode',
-	]);
+it('reaches for vscode alone in the node bundle', () => {
+	expect(required(node)).toEqual(['vscode']);
 });
 
 const required = (bundle: string) => [
@@ -100,14 +91,23 @@ it.each(nodeGlobals)('the browser bundle does not reach for %s, which the worker
 });
 
 /**
- * The desktop host has no WebUSB and no way to reach one, so every symbol below
- * is code that could only fail there. It arrives by an import crossing from the
- * browser entry, which nothing else notices until a user runs the command.
+ * Every byte that reaches a board goes through the manager extension, so no
+ * bundle here may carry a transport of its own: WebUSB, the connection library
+ * or a drive search would be a second owner of one board.
  */
-const webUsb = [/\bnavigator\b/, /requestDevice/, /USBDevice/, /microbit-connection/];
+const boardAccess = [/\bnavigator\.usb\b/, /requestDevice/, /USBDevice/, /microbit-connection/, /DETAILS\.TXT/];
 
-it.each(webUsb)('the node bundle does not carry %s', (pattern) => {
+it.each(boardAccess)('neither extension bundle carries %s', (pattern) => {
 	expect(node).not.toMatch(pattern);
+	expect(browser).not.toMatch(pattern);
+});
+
+/**
+ * The types package is `import type` only, so nothing of it may survive into a
+ * bundle: a value imported from it would be the day it stopped being types-only.
+ */
+it.each(BOTH)('the %s bundle carries nothing from the manager API package', (which) => {
+	expect(bundleFor(which)).not.toMatch(/bbcmicrobit-manager-api/);
 });
 
 /**

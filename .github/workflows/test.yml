@@ -30,6 +30,14 @@ jobs:
           node-version: 24.x
           cache: npm
 
+      # This extension depends on the BBC micro:bit Manager. Its types package
+      # is a file: dependency on a sibling checkout until it is published, and
+      # the integration runs load the manager itself from the same checkout.
+      - name: Check out and build the micro:bit Manager beside this repository
+        run: |
+          git clone --depth 1 https://github.com/carlosperate/vscode-microbit-manager.git ../vscode-microbit-manager
+          cd ../vscode-microbit-manager && npm ci && npm run build
+
       - run: npm ci
 
       - run: npm run typecheck

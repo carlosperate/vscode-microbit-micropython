@@ -1,26 +1,41 @@
 import { microbitBoardId } from '@microbit/microbit-fs';
+import type { BoardInfo, HexSource, MicrobitManagerApi } from 'bbcmicrobit-manager-api';
 import * as vscode from 'vscode';
 
-import { COMMANDS, DEVICE_VIEW_ID, PRODUCT, SECTION, SERIAL_MONITOR_EXTENSION, SETTINGS } from '../../src/config';
-import { hexFilename } from '../../src/filename';
+import type { ExtensionApi } from '../../src/activate';
+import { flash } from '../../src/commands/flash';
+import {
+	COMMANDS,
+	CONTAINER_ID,
+	EXTENSION_ID,
+	MANAGER_EXTENSION,
+	MODE_ID,
+	MODE_WHEN,
+	PRODUCT,
+	SECTION,
+	SERIAL_MONITOR_EXTENSION,
+	SETTINGS,
+} from '../../src/config';
 import { chooseWorkspaceFolder, resolveProject, selectWorkspaceFiles } from '../../src/files/workspace';
 import { readFirmware } from '../../src/hex/assets';
 import { buildFs, generateHex } from '../../src/hex/build';
+import { isManagerApi } from '../../src/manager/api';
+import { claimsWorkspace } from '../../src/manager/mode';
 import { readSimulatorHtml } from '../../src/simulator/assets';
+import { commandFor } from '../../src/simulator/controls';
+import { SHELL_CONTROLS } from '../../src/simulator/protocol';
 import { VIEW_ID } from '../../src/simulator/view';
-import { connectToBoard, type UsbIdentity } from '../../src/usb/connect';
 
 /**
  * The integration tests: the same bundle run on two hosts, `@vscode/test-web` in
  * a browser and `@vscode/test-electron` on the desktop. It exists for the things
  * a stubbed `vscode` cannot see, above all whether the manifest and the code
- * agree about what this extension contributes.
+ * agree about what this extension contributes, and whether the manager this
+ * extension depends on accepted its mode.
  *
  * Every check reports before it asserts, so a failing run says which assumption
  * broke rather than stopping at the first one.
  */
-const EXTENSION_ID = 'carlosperate.bbcmicrobit-micropython';
-
 interface Result {
 	name: string;
 	ok: boolean;
@@ -41,7 +56,7 @@ function record(name: string, ok: boolean, detail: string): void {
 const benchRoot = () => vscode.workspace.workspaceFolders?.[0]?.uri;
 
 export async function run(): Promise<void> {
-	const extension = vscode.extensions.getExtension(EXTENSION_ID);
+	const extension = vscode.extensions.getExtension<ExtensionApi>(EXTENSION_ID);
 	if (!extension) {
 		throw new Error(
 			`${EXTENSION_ID} is not loaded. --extensionTestsPath must point inside ` +
@@ -49,22 +64,24 @@ export async function run(): Promise<void> {
 		);
 	}
 
-	await checkActivation(extension);
-	await checkTheHostLoadedItsOwnEntry(extension);
+	const exported = await checkActivation(extension);
+	checkTheHostLoadedItsOwnEntry(exported);
 	await checkBothEntriesShip(extension);
 	await checkTheSimulatorShips(extension);
+	checkTheViewsJoinTheSharedPanel(extension);
 	checkItRunsBesideTheHardware(extension);
-	checkAMountPointJoinsToAFile();
 	await checkContributedCommandsResolve(extension);
 	checkEveryCommandSaysWhoOwnsIt(extension);
 	await checkSerialMonitorCompanion();
+	const manager = await checkTheManagerAcceptedTheMode(exported);
+	await checkTheDocumentButtonsRunRealCommands(manager);
+	await checkOpeningTheSimulatorMakesThisTheMode(manager);
+	await checkTheWorkspaceIsClaimed();
 	await checkSelectionOnTheRealWorkspace();
 	const built = await checkHexBuildsFromTheRealWorkspace(extension);
 	if (built) await checkTheHexSurvivesBeingSaved(built);
+	if (manager) await checkAFlashHandsTheManagerWhatItBuilt(extension, manager);
 	await checkSelectionFollowsTheProjectFolder();
-	await reportWebUsb();
-	await checkTheChooserIsNeverReached(await reportTheUsbBridge());
-	await checkAHostileNavigatorIsSurvived(extension);
 
 	// Last, and never in the middle. Replacing workspace folder 0 may terminate
 	// and restart every running extension, this script included, so anything after
@@ -76,282 +93,34 @@ export async function run(): Promise<void> {
 }
 
 /**
- * Reading a file that ships inside the extension is the one thing that differs
- * most between the two hosts: `extensionUri` is a real `file:` URI on the
- * desktop, which `fetch` refuses outright, and an http URL in a browser, which
- * answers a missing file with an error page and a 200 rather than a failure.
- * Only a real host has an `extensionUri` at all, so nothing below this layer
- * can tell whether the reader in use works on it.
- *
- * The build that follows is the heaviest thing this extension does, a megabyte
- * of Intel hex parsed and reassembled, and it happens inside a Web Worker on
- * both hosts. Unit tests run it in Node, where a great deal more is available.
- */
-async function checkHexBuildsFromTheRealWorkspace(
-	extension: vscode.Extension<unknown>
-): Promise<string | undefined> {
-	let images;
-	try {
-		images = await Promise.all([
-			readFirmware(extension.extensionUri, 'V1'),
-			readFirmware(extension.extensionUri, 'V2'),
-		]);
-	} catch (error) {
-		record('the shipped firmware is readable', false, `from ${extension.extensionUri}: ${String(error)}`);
-		return undefined;
-	}
-	record(
-		'the shipped firmware is readable',
-		true,
-		`${images.map((image) => `${image.file} (${image.hex.length} characters)`).join(', ')}`
-	);
-
-	const root = benchRoot();
-	if (!root) {
-		record('a hex builds from the workspace', false, 'no workspace folder to build from');
-		return undefined;
-	}
-
-	const selection = await selectWorkspaceFiles(root);
-	if (!selection.files.length) {
-		record('a hex builds from the workspace', false, 'the workspace had no files to build from');
-		return undefined;
-	}
-
-	try {
-		const { hex, used, available } = generateHex(buildFs(images, selection.files));
-		record(
-			'a hex builds from the workspace',
-			hex.startsWith(':'),
-			`${hex.length} characters, using ${used} of ${available} bytes of storage`
-		);
-		return hex;
-	} catch (error) {
-		record('a hex builds from the workspace', false, String(error));
-		return undefined;
-	}
-}
-
-/**
- * The write Save Hex ends in, against whichever scheme this host gave the
- * workspace: virtual in the browser, real `file:` URIs on the desktop. Only a
- * real host has either, and a megabyte of Intel hex is the payload that would
- * show up a provider mangling what it was given.
- *
- * The command itself is not run. It opens a save dialog nobody can answer in a
- * headless session, and a run that hangs there is worse than one check less.
- * That its id is registered at all is covered above.
- */
-async function checkTheHexSurvivesBeingSaved(built: string): Promise<void> {
-	const name = 'the hex is written back out as a real file';
-	const root = benchRoot();
-	if (!root) {
-		record(name, false, 'no workspace folder to write into');
-		return;
-	}
-
-	const target = vscode.Uri.joinPath(root, hexFilename('integration'));
-	// The desktop bench is a real folder in this repository.
-	if (await exists(target)) {
-		record(name, false, `${target} is already there, and is not this check's to overwrite`);
-		return;
-	}
-
-	try {
-		await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(built));
-		const read = new TextDecoder().decode(await vscode.workspace.fs.readFile(target));
-		record(name, read === built && holdsBothBoards(read), `${target}, ${read.length} characters read back`);
-	} catch (error) {
-		record(name, false, String(error));
-	} finally {
-		await remove(target);
-	}
-}
-
-/**
- * A universal hex opens each board's block with that board's id followed by
- * C0DE. Output carrying one of them is half the size and runs on half a
- * classroom, which is the failure worth naming rather than counting bytes.
- */
-const holdsBothBoards = (hex: string) =>
-	[microbitBoardId.V1, microbitBoardId.V2].every((id) => hex.includes(`${id.toString(16)}C0DE`));
-
-/**
- * The project folder setting, against a real configuration service.
- *
- * The path rules are unit-tested; what only a host can show is that the setting
- * is read back at the scope it was written to, that the folder it names is
- * stat-ed on this host's scheme, and that a folder which is not there is a
- * refusal rather than an exception out of `prepareHex`. The bench already has
- * the shape: `lib/` holds one file the root does not.
- */
-async function checkSelectionFollowsTheProjectFolder(): Promise<void> {
-	const name = 'selection follows the project folder';
-	const folder = vscode.workspace.workspaceFolders?.[0];
-	if (!folder) {
-		record(name, false, 'no workspace folder to configure');
-		return;
-	}
-
-	// The bench's `.vscode/` is gitignored, so a developer's own launch
-	// configuration can be sitting in it and is not this check's to delete.
-	const dotVscode = vscode.Uri.joinPath(folder.uri, '.vscode');
-	const settingsFile = vscode.Uri.joinPath(dotVscode, 'settings.json');
-	const existedBefore = { folder: await exists(dotVscode), file: await exists(settingsFile) };
-
-	const settings = vscode.workspace.getConfiguration(SECTION, folder.uri);
-	// A developer mid-way through checking this feature by hand has one set.
-	const before = settings.inspect(SETTINGS.projectFolder)?.workspaceFolderValue;
-	try {
-		await settings.update(SETTINGS.projectFolder, 'lib', vscode.ConfigurationTarget.WorkspaceFolder);
-		const project = await resolveProject(folder);
-		const names = project.ok ? (await selectWorkspaceFiles(project.uri)).files.map((file) => file.name) : [];
-		record(name, project.ok && names.join(',') === 'helper.py', `lib/ selected [${names.join(', ')}]`);
-
-		await settings.update(SETTINGS.projectFolder, 'nowhere', vscode.ConfigurationTarget.WorkspaceFolder);
-		const missing = await resolveProject(folder);
-		record(
-			'a project folder that is not there is refused',
-			!missing.ok && missing.problem === 'missing',
-			missing.ok ? 'it resolved anyway' : `problem=${missing.problem}, named=${missing.named}`
-		);
-
-	} catch (error) {
-		record(name, false, String(error));
-	} finally {
-		// Back to whatever was there, which is usually nothing.
-		await settings
-			.update(SETTINGS.projectFolder, before, vscode.ConfigurationTarget.WorkspaceFolder)
-			.then(undefined, () => undefined);
-
-		// Only what this check made. Neither delete is recursive, so a `.vscode`
-		// that still holds something of somebody else's survives.
-		if (!existedBefore.file) await remove(settingsFile);
-		if (!existedBefore.folder) await remove(dotVscode);
-	}
-}
-
-const exists = (uri: vscode.Uri) =>
-	vscode.workspace.fs.stat(uri).then(
-		() => true,
-		() => false
-	);
-
-const remove = (uri: vscode.Uri) => vscode.workspace.fs.delete(uri).then(undefined, () => undefined);
-
-/**
- * The selection rules are unit-tested against injected readers; this is the only
- * place they meet a real `workspace.fs`, on a virtual scheme in the browser and
- * real `file:` URIs on the desktop.
- */
-async function checkSelectionOnTheRealWorkspace(): Promise<void> {
-	const root = benchRoot();
-	if (!root) {
-		record('selection reads the real workspace', false, 'no workspace folder to read');
-		return;
-	}
-
-	const selection = await selectWorkspaceFiles(root);
-	const names = selection.files.map((file) => file.name).sort();
-
-	record(
-		'selection reads the real workspace',
-		names.join(',') === 'data.txt,main.py' && selection.folders.join(',') === 'lib',
-		`files=[${names.join(', ')}], folders=[${selection.folders.join(', ')}]`
-	);
-}
-
-/**
- * A host can swap the workspace folder in place, and a root captured once goes
- * stale with nothing to notice it. Worth checking in a real host because
- * `vscode-test-web` accepts `updateWorkspaceFolders` and reports the new folder
- * while never delivering `onDidChangeWorkspaceFolders`: anything that refreshed
- * itself from that event would pass its own unit tests and be wrong here.
- */
-async function checkSelectionFollowsTheRoot(): Promise<void> {
-	const original = vscode.workspace.workspaceFolders?.[0]?.uri;
-	if (!original) {
-		record('selection follows a swapped root', false, 'no workspace folder to swap');
-		return;
-	}
-
-	const elsewhere = vscode.Uri.joinPath(original, 'lib');
-	const swapped = vscode.workspace.updateWorkspaceFolders(0, 1, { uri: elsewhere });
-	if (!swapped) {
-		record('selection follows a swapped root', false, 'updateWorkspaceFolders refused the swap');
-		return;
-	}
-
-	// Through `chooseWorkspaceFolder`, because it is what reads `workspaceFolders`
-	// now and so it is what could go stale. One folder means it answers without
-	// putting a quick pick in front of a headless run.
-	const folder = await chooseWorkspaceFolder();
-	if (!folder) {
-		record('selection follows a swapped root', false, 'no root came back after the swap');
-		return;
-	}
-
-	const selection = await selectWorkspaceFiles(folder.uri);
-	const names = selection.files.map((file) => file.name);
-	record(
-		'selection follows a swapped root',
-		names.join(',') === 'helper.py',
-		`after swapping the root to lib/: files=[${names.join(', ')}]`
-	);
-
-	// The root is left swapped. Restoring it would be a second
-	// `updateWorkspaceFolders` without waiting for the change event in between,
-	// which the API says not to do, and the window this runs in is thrown away.
-}
-
-/**
- * There is no unhandled-rejection check here, and that is deliberate.
- *
- * `self` in the extension host is a `DedicatedWorkerGlobalScope` and
- * `addEventListener('unhandledrejection', …)` attaches without complaint, but the
- * listener never fires: a bare `Promise.reject()` from inside the host goes
- * unseen. Even if it did fire, `onStartupFinished` means the extension is already
- * active before this script loads, so an activation rejection would be long past
- * and `extension.activate()` would only replay a cached result.
- *
- * A check that cannot fail reads as coverage and provides none. Catching this
- * would need a seam in the extension itself, which is not worth adding for it.
- */
-
-/**
  * An activation that throws leaves the extension registered but inert, and says
  * nothing in the UI, so this is the check that turns "the extension does
  * nothing" into a named failure. A failure that already happened at startup is
  * replayed here, because `activate()` hands back the cached result.
  */
-async function checkActivation(extension: vscode.Extension<unknown>): Promise<void> {
+async function checkActivation(extension: vscode.Extension<ExtensionApi>): Promise<ExtensionApi | undefined> {
 	try {
-		await extension.activate();
+		const exported = await extension.activate();
+		record('activation completes', extension.isActive, `isActive=${extension.isActive}`);
+		return exported;
 	} catch (error) {
 		record('activation completes', false, `activate() threw: ${String(error)}`);
-		return;
+		return undefined;
 	}
-
-	record('activation completes', extension.isActive, `isActive=${extension.isActive}`);
 }
 
 /**
  * Which entry point ran. There are two, one per host, and the choice between
  * them is the editor's: an extension declaring both `main` and `browser` gets
- * `main` in a Node host and `browser` in a Web Worker one.
- *
- * Nothing else can see which arrived. A wrong answer means one host is running
- * code written for the other, and the first sign of it is a command failing at
- * a `navigator` or an `fs` that is not there.
+ * `main` in a Node host and `browser` in a Web Worker one. Nothing else can see
+ * which arrived.
  */
-async function checkTheHostLoadedItsOwnEntry(extension: vscode.Extension<unknown>): Promise<void> {
-	// `activate()` hands back the cached exports, so this costs nothing.
-	const api = (await extension.activate()) as { entry?: unknown } | undefined;
+function checkTheHostLoadedItsOwnEntry(exported: ExtensionApi | undefined): void {
 	const expected = vscode.env.uiKind === vscode.UIKind.Desktop ? 'node' : 'browser';
 	record(
 		'the host loads the entry point written for it',
-		api?.entry === expected,
-		`uiKind=${expected === 'node' ? 'Desktop' : 'Web'}, entry=${JSON.stringify(api?.entry)}, expected ${expected}`
+		exported?.entry === expected,
+		`uiKind=${expected === 'node' ? 'Desktop' : 'Web'}, entry=${JSON.stringify(exported?.entry)}, expected ${expected}`
 	);
 }
 
@@ -395,33 +164,37 @@ async function checkTheSimulatorShips(extension: vscode.Extension<unknown>): Pro
 	} catch (error) {
 		record('the webview shell is where the document expects it', false, `${shell}: ${String(error)}`);
 	}
-
-	const views: { id?: string; type?: string }[] =
-		extension.packageJSON?.contributes?.views?.['bbcmicrobit-micropython'] ?? [];
-	const view = views.find((entry) => entry.id === VIEW_ID);
-	record('the manifest contributes the simulator view', view?.type === 'webview', JSON.stringify(views));
-	record(
-		'the device section sits above the simulator',
-		views[0]?.id === DEVICE_VIEW_ID && views[1]?.id === VIEW_ID,
-		views.map((entry) => entry.id).join(' then ')
-	);
 }
 
 /**
- * Where a desktop flash writes. The drive search hands back a mount point, a
- * bare drive letter on Windows and a path everywhere else, and joining a
- * filename onto it has to produce something the filesystem accepts. The drive
- * letter is the one that can surprise, and only a real host has `Uri` to try it.
+ * The view goes into the container the manager declares, gated on the key it
+ * sets for this mode. A container id that does not resolve sends it to the
+ * Explorer with nothing but a log line, and a view without the clause would stay
+ * visible inside every other mode. Both are manifest strings the workbench
+ * interprets, so nothing else notices a typo.
  */
-function checkAMountPointJoinsToAFile(): void {
-	if (vscode.env.uiKind !== vscode.UIKind.Desktop) return;
+function checkTheViewsJoinTheSharedPanel(extension: vscode.Extension<unknown>): void {
+	const containers: unknown[] = extension.packageJSON?.contributes?.viewsContainers?.activitybar ?? [];
+	record(
+		'no container of our own is declared',
+		containers.length === 0,
+		containers.length ? `declares ${JSON.stringify(containers)}` : 'the manager owns the only one'
+	);
 
-	const windows = process.platform === 'win32';
-	const mount = windows ? 'E:' : '/Volumes/MICROBIT';
-	const joined = vscode.Uri.joinPath(vscode.Uri.file(mount), 'workspace.hex');
-	const wanted = windows ? /^[A-Za-z]:\\workspace\.hex$/ : /^\/Volumes\/MICROBIT\/workspace\.hex$/;
-
-	record('a mount point joins to a file path', wanted.test(joined.fsPath), `${mount} -> ${joined.fsPath}`);
+	// One view, because the workbench splits a section's height equally between a
+	// non-owner's views; the buttons are drawn inside the simulator's document.
+	const views: { id?: string; type?: string; when?: string }[] =
+		extension.packageJSON?.contributes?.views?.[CONTAINER_ID] ?? [];
+	record(
+		'the simulator is the one view in the shared container',
+		views.length === 1 && views[0]?.id === VIEW_ID && views[0]?.type === 'webview',
+		`${CONTAINER_ID} holds ${views.map((entry) => entry.id).join(' then ') || 'nothing'}`
+	);
+	record(
+		'every view is gated on the mode key the manager sets',
+		views.length > 0 && views.every((view) => view.when === MODE_WHEN),
+		views.map((view) => `${view.id} when ${view.when ?? 'always'}`).join('; ')
+	);
 }
 
 /**
@@ -429,11 +202,8 @@ function checkAMountPointJoinsToAFile(): void {
  * default for one is the **workspace**, so in a Remote-SSH, WSL, container or
  * Codespaces window it would run on the remote and go looking for a mounted
  * board on a machine the user has never plugged one into. `ui` keeps it beside
- * the hardware, and beside the serial companion it hands every terminal to,
- * which declares the same.
- *
- * Read back from the host rather than from the manifest, so this is the kind
- * that was actually resolved and not a second copy of what we asked for.
+ * the hardware, and beside the manager and serial companion, which declare the
+ * same.
  */
 function checkItRunsBesideTheHardware(extension: vscode.Extension<unknown>): void {
 	record(
@@ -446,9 +216,7 @@ function checkItRunsBesideTheHardware(extension: vscode.Extension<unknown>): voi
 /**
  * The manifest and the registrations live in different files, so they drift
  * silently: the palette lists a contributed command whatever happens, and only
- * running it reveals there is no handler. Read the ids from the manifest at
- * runtime rather than repeating them here, or this check only ever proves that
- * two copies of the same typo agree.
+ * running it reveals there is no handler.
  */
 async function checkContributedCommandsResolve(extension: vscode.Extension<unknown>): Promise<void> {
 	const contributed: string[] = (extension.packageJSON?.contributes?.commands ?? []).map(
@@ -460,7 +228,6 @@ async function checkContributedCommandsResolve(extension: vscode.Extension<unkno
 		return;
 	}
 
-	// `true` includes commands that are registered but not shown in the palette.
 	const registered = await vscode.commands.getCommands(true);
 	const missing = contributed.filter((id) => !registered.includes(id));
 	record(
@@ -474,12 +241,10 @@ async function checkContributedCommandsResolve(extension: vscode.Extension<unkno
 
 /**
  * A command with no category reads in the palette as a bare "Flash", beside the
- * Foundation's own entries, with nothing saying which extension owns it. It is
- * manifest-only, so a wrong one breaks nothing until somebody reads the palette.
+ * Foundation's own entries, with nothing saying which extension owns it.
  */
 function checkEveryCommandSaysWhoOwnsIt(extension: vscode.Extension<unknown>): void {
-	const contributed: { command: string; category?: string }[] =
-		extension.packageJSON?.contributes?.commands ?? [];
+	const contributed: { command: string; category?: string }[] = extension.packageJSON?.contributes?.commands ?? [];
 	const wrong = contributed.filter((entry) => entry.category !== PRODUCT);
 	record(
 		'every contributed command is filed under the product name',
@@ -530,152 +295,375 @@ async function waitForCommand(command: string): Promise<boolean> {
 }
 
 /**
- * Reported, never asserted. WebUSB reaching the extension host is a property of
- * whichever workbench is hosting us, not of this extension, and the answer
- * decides whether the device work can be developed against this harness at all.
- * A failure here would say nothing about our code.
+ * The seam the split created, and the only place it can be seen: the manager is
+ * loaded, its exports are the API this extension was built against, and it
+ * accepted the mode, which is what puts our views in its panel. Its absence is
+ * a harness fault and is reported as one.
  */
-async function reportWebUsb(): Promise<void> {
-	const usb = webUsb();
-	if (!usb) {
-		record('WebUSB in the extension host', true, `navigator.usb is absent${hasNavigator() ? '' : ', with no navigator'}`);
-		return;
+async function checkTheManagerAcceptedTheMode(exported: ExtensionApi | undefined): Promise<MicrobitManagerApi | undefined> {
+	const manager = vscode.extensions.getExtension(MANAGER_EXTENSION);
+	if (!manager) {
+		record(
+			'the manager extension is loaded beside this one',
+			false,
+			`${MANAGER_EXTENSION} is not loaded. The harness passes ../vscode-microbit-manager with --extensionPath on web and --extension on desktop.`
+		);
+		return undefined;
 	}
 
+	let api: unknown;
 	try {
-		const devices = await usb.getDevices();
-		record('WebUSB in the extension host', true, `navigator.usb present, ${devices.length} already authorised`);
+		api = await manager.activate();
 	} catch (error) {
-		record('WebUSB in the extension host', true, `navigator.usb present, getDevices() threw: ${String(error)}`);
+		record('the manager extension activates', false, `activate() threw: ${String(error)}`);
+		return undefined;
+	}
+	record(
+		"the manager's exports are the API this extension was built against",
+		isManagerApi(api),
+		isManagerApi(api) ? `version ${api.version}` : `exports=${typeof api}`
+	);
+	if (!isManagerApi(api)) return undefined;
+
+	record(
+		'the manager accepted the mode',
+		exported?.manager.registered === true,
+		`registered=${String(exported?.manager.registered)}${exported?.manager.problem ? `, problem: ${exported.manager.problem}` : ''}`
+	);
+	record(
+		'MicroPython is the active mode, being the only one',
+		api.activeMode() === MODE_ID,
+		`activeMode()=${String(api.activeMode())}`
+	);
+	return api;
+}
+
+/**
+ * The document's buttons post a control the view turns into a command, ours or
+ * the manager's, so a wrong id is a button that logs and does nothing. Only a
+ * real host knows which commands exist, so the mapping is checked against it here.
+ */
+async function checkTheDocumentButtonsRunRealCommands(manager: MicrobitManagerApi | undefined): Promise<void> {
+	const registered = await vscode.commands.getCommands(true);
+	const mapped = SHELL_CONTROLS.map((control) => ({
+		control,
+		command: commandFor(control, () => manager?.commands.openTerminal),
+	})).filter((entry): entry is { control: (typeof SHELL_CONTROLS)[number]; command: string } => !!entry.command);
+	const unknown = mapped.filter((entry) => !registered.includes(entry.command));
+	record(
+		"the document's buttons run commands the host registered",
+		mapped.length === 3 && unknown.length === 0,
+		`${mapped.map((entry) => `${entry.control} runs ${entry.command}`).join('; ')}${
+			unknown.length ? `; unknown: ${unknown.map((entry) => entry.command).join(', ')}` : ''
+		}`
+	);
+}
+
+/**
+ * A view gated out of the panel cannot be revealed, so a simulator command run
+ * while another mode is active first makes this the mode, through the manager's
+ * own switch, as if the user had chosen it. A throwaway second mode stands in
+ * for the other one.
+ */
+async function checkOpeningTheSimulatorMakesThisTheMode(manager: MicrobitManagerApi | undefined): Promise<void> {
+	if (!manager) return;
+	const other = manager.registerMode({
+		apiVersion: '0.1.0',
+		id: 'other',
+		extensionId: 'bbcmicrobit-test.other',
+		label: 'Other',
+	});
+	try {
+		await vscode.commands.executeCommand(manager.commands.switchMode, 'other');
+		const before = manager.activeMode();
+		await vscode.commands.executeCommand(COMMANDS.openSimulator);
+		record(
+			'Open Simulator makes MicroPython the active mode when another was',
+			before === 'other' && manager.activeMode() === MODE_ID,
+			`before=${String(before)}, after=${String(manager.activeMode())}`
+		);
+	} finally {
+		other.dispose();
+	}
+}
+
+/** The bench holds `main.py`, so the mode claims it; that is what seeds the switcher in a Python workspace. */
+async function checkTheWorkspaceIsClaimed(): Promise<void> {
+	try {
+		const claimed = await claimsWorkspace();
+		record('a workspace holding Python files is claimed', claimed, `claimsWorkspace()=${String(claimed)}`);
+	} catch (error) {
+		record('a workspace holding Python files is claimed', false, String(error));
 	}
 }
 
 /**
- * `navigator` is a browser global and the Node extension host has none, so
- * reading through it is a `ReferenceError` there rather than an absent WebUSB.
- * The `try` is for the other end of the same question: a privacy extension can
- * replace the property with a getter that throws.
+ * The selection rules are unit-tested against injected readers; this is the only
+ * place they meet a real `workspace.fs`, on a virtual scheme in the browser and
+ * real `file:` URIs on the desktop.
  */
-const hasNavigator = () => typeof navigator !== 'undefined';
+async function checkSelectionOnTheRealWorkspace(): Promise<void> {
+	const root = benchRoot();
+	if (!root) {
+		record('selection reads the real workspace', false, 'no workspace folder to read');
+		return;
+	}
 
-function webUsb(): { getDevices(): Promise<unknown[]> } | undefined {
+	const selection = await selectWorkspaceFiles(root);
+	const names = selection.files.map((file) => file.name).sort();
+
+	record(
+		'selection reads the real workspace',
+		names.join(',') === 'data.txt,main.py' && selection.folders.join(',') === 'lib',
+		`files=[${names.join(', ')}], folders=[${selection.folders.join(', ')}]`
+	);
+}
+
+/**
+ * Reading a file that ships inside the extension is the one thing that differs
+ * most between the two hosts: `extensionUri` is a real `file:` URI on the
+ * desktop, which `fetch` refuses outright, and an http URL in a browser, which
+ * answers a missing file with an error page and a 200 rather than a failure.
+ *
+ * The build that follows is the heaviest thing this extension does, a megabyte
+ * of Intel hex parsed and reassembled, and it happens inside a Web Worker on
+ * both hosts. Unit tests run it in Node, where a great deal more is available.
+ */
+async function checkHexBuildsFromTheRealWorkspace(extension: vscode.Extension<unknown>): Promise<string | undefined> {
+	let images;
 	try {
-		return hasNavigator() ? (navigator as Navigator & { usb?: { getDevices(): Promise<unknown[]> } }).usb : undefined;
-	} catch {
+		images = await Promise.all([
+			readFirmware(extension.extensionUri, 'V1'),
+			readFirmware(extension.extensionUri, 'V2'),
+		]);
+	} catch (error) {
+		record('the shipped firmware is readable', false, `from ${extension.extensionUri}: ${String(error)}`);
+		return undefined;
+	}
+	record(
+		'the shipped firmware is readable',
+		true,
+		`${images.map((image) => `${image.file} (${image.hex.length} characters)`).join(', ')}`
+	);
+
+	const root = benchRoot();
+	if (!root) {
+		record('a hex builds from the workspace', false, 'no workspace folder to build from');
+		return undefined;
+	}
+
+	const selection = await selectWorkspaceFiles(root);
+	if (!selection.files.length) {
+		record('a hex builds from the workspace', false, 'the workspace had no files to build from');
+		return undefined;
+	}
+
+	try {
+		const { hex, used, available } = generateHex(buildFs(images, selection.files));
+		record(
+			'a hex builds from the workspace',
+			hex.startsWith(':'),
+			`${hex.length} characters, using ${used} of ${available} bytes of storage`
+		);
+		return hex;
+	} catch (error) {
+		record('a hex builds from the workspace', false, String(error));
 		return undefined;
 	}
 }
 
-const REQUEST_USB_DEVICE = 'workbench.experimental.requestUsbDevice';
-
 /**
- * Pairing goes through a command the workbench registers on the main thread,
- * because `requestDevice` is `Window`-only and the extension host is a worker.
- * Only the web workbench registers it: the desktop bundle carries the class
- * that would and never instantiates it. Reported rather than asserted, because
- * it is the host's property and the answer differs on purpose.
+ * The write Save Hex ends in, against whichever scheme this host gave the
+ * workspace: virtual in the browser, real `file:` URIs on the desktop. The
+ * command itself is not run: it ends in the manager's save dialog, which nobody
+ * can answer in a headless session.
  */
-async function reportTheUsbBridge(): Promise<boolean> {
-	const registered = await vscode.commands.getCommands(true);
-	const present = registered.includes(REQUEST_USB_DEVICE);
-	record(
-		'the workbench bridges requestDevice',
-		true,
-		present ? `${REQUEST_USB_DEVICE} is registered` : `${REQUEST_USB_DEVICE} is absent, so nothing can be paired here`
-	);
-	return present;
-}
+async function checkTheHexSurvivesBeingSaved(built: string): Promise<void> {
+	const name = 'the hex is written back out as a real file';
+	const root = benchRoot();
+	if (!root) {
+		record(name, false, 'no workspace folder to write into');
+		return;
+	}
 
-/**
- * The library falls through to a device chooser that does not exist in this
- * host, and the guard against it is a decision taken before the library is
- * asked. Run against the real `navigator.usb` and the real command list, since
- * what is being checked is what a host answers with nothing plugged in.
- *
- * Nothing here touches the extension's own connection: module state belongs to
- * the bundle it was loaded in, and this script is a second bundle, so its copy
- * of `src/usb/connection.ts` has none of the extension's.
- */
-async function checkTheChooserIsNeverReached(bridged: boolean): Promise<void> {
-	const name = 'no board means no connection attempt';
-	let connected = false;
-	let asked = false;
-	const usb = webUsb();
+	const target = vscode.Uri.joinPath(root, 'integration.hex');
+	// The desktop bench is a real folder in this repository.
+	if (await exists(target)) {
+		record(name, false, `${target} is already there, and is not this check's to overwrite`);
+		return;
+	}
 
 	try {
-		const outcome = await connectToBoard({
-			authorised: async () => ((await usb?.getDevices()) ?? []) as UsbIdentity[],
-			canPair: () => bridged,
-			// Stubbed, and only here: the real bridge opens a chooser nothing in a
-			// headless run can answer.
-			pair: async () => {
-				asked = true;
-				return undefined;
-			},
-			connect: async () => {
-				connected = true;
-			},
-			attached: () => undefined,
-			log: () => undefined,
-		});
-
-		// A developer running this with a board already authorised in the profile
-		// takes the other branch, and that is a pass as well: what must not happen
-		// is connecting with nothing for the library to find.
-		const expected = connected
-			? outcome.done === 'connected' && !asked
-			: outcome.done === 'unpairable' && asked === bridged;
-		record(name, expected, `outcome=${outcome.done}, pairing asked=${asked}, connect called=${connected}`);
+		await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(built));
+		const read = new TextDecoder().decode(await vscode.workspace.fs.readFile(target));
+		record(name, read === built && holdsBothBoards(read), `${target}, ${read.length} characters read back`);
 	} catch (error) {
 		record(name, false, String(error));
+	} finally {
+		await remove(target);
 	}
 }
 
 /**
- * Some privacy extensions replace `navigator.usb` with a getter that throws, and
- * the connection library reads that property unguarded in its availability check,
- * its `initialize()` and its `dispose()`. Every guard against it is ours.
- *
- * Only a real host can show this working: the reads are the library's, and it is
- * the extension's own live connection that has to survive them.
- *
- * **This covers the availability check and nothing else.** Activation is long over
- * by the time any test script loads, and disposal happens after this restores the
- * property, so the guards on those two are carried by inspection rather than by a
- * check. What is exercised is the command every WebUSB path goes through, which
- * has to refuse rather than throw.
+ * A universal hex opens each board's block with that board's id followed by
+ * C0DE. Output carrying one of them is half the size and runs on half a
+ * classroom, which is the failure worth naming rather than counting bytes.
  */
-async function checkAHostileNavigatorIsSurvived(extension: vscode.Extension<unknown>): Promise<void> {
-	const name = 'a navigator.usb that throws is refused, not fatal';
-	// The Node host has no navigator at all, and nothing there reads WebUSB.
-	if (!hasNavigator()) {
-		console.log('[test] SKIP  this host has no navigator to make hostile');
+const holdsBothBoards = (hex: string) =>
+	[microbitBoardId.V1, microbitBoardId.V2].every((id) => hex.includes(`${id.toString(16)}C0DE`));
+
+/**
+ * The cross-extension seam, from this side: Flash asks the manager which board,
+ * builds for that board and no other, and hands the hex back with the same board
+ * as `expect`. The manager's half is stubbed, since the real `connect()` ends at
+ * a device chooser on web and a drive search on desktop, neither of which a
+ * headless run can answer; what is proved is that the bytes and the board that
+ * reach `flashHex` are the ones the contract promises.
+ */
+async function checkAFlashHandsTheManagerWhatItBuilt(
+	extension: vscode.Extension<unknown>,
+	manager: MicrobitManagerApi
+): Promise<void> {
+	const name = 'Flash builds for the board the manager answered and hands it back as expect';
+	const board: BoardInfo = { version: 'V2', serialNumber: 'integration-test' };
+	let connects = 0;
+	let received: { hex: HexSource; expect: BoardInfo | undefined } | undefined;
+	const stub: MicrobitManagerApi = {
+		...manager,
+		connect: () => {
+			connects += 1;
+			return Promise.resolve(board);
+		},
+		flashHex: (hex, options) => {
+			received = { hex, expect: options?.expect };
+			return Promise.resolve(true);
+		},
+	};
+
+	// Only what `prepareHex` reads: the firmware's location and the omission memory.
+	const context = {
+		extensionUri: extension.extensionUri,
+		workspaceState: { get: () => undefined, update: () => Promise.resolve(), keys: () => [] },
+	} as unknown as vscode.ExtensionContext;
+
+	try {
+		await flash({ api: () => stub, status: { registered: true, problem: undefined } })(context);
+	} catch (error) {
+		record(name, false, `Flash threw: ${String(error)}`);
 		return;
 	}
 
-	const original = Object.getOwnPropertyDescriptor(navigator, 'usb');
-	try {
-		Object.defineProperty(navigator, 'usb', {
-			configurable: true,
-			get() {
-				throw new Error('navigator.usb is blocked');
-			},
-		});
-	} catch (error) {
-		console.log(`[test] SKIP  navigator.usb cannot be replaced in this host: ${String(error)}`);
+	const hex = typeof received?.hex === 'string' ? received.hex : undefined;
+	record(
+		name,
+		connects === 1 && hex !== undefined && hex.startsWith(':') && !holdsBothBoards(hex) && received?.expect === board,
+		`connect() called ${connects} time(s), flashHex got ${hex ? `${hex.length} characters of a ${holdsBothBoards(hex) ? 'universal' : 'single-board'} hex` : 'nothing'}, expect ${received?.expect === board ? 'is the board connect() answered' : JSON.stringify(received?.expect)}`
+	);
+}
+
+/**
+ * The project folder setting, against a real configuration service.
+ *
+ * The path rules are unit-tested; what only a host can show is that the setting
+ * is read back at the scope it was written to, that the folder it names is
+ * stat-ed on this host's scheme, and that a folder which is not there is a
+ * refusal rather than an exception out of `prepareHex`. The bench already has
+ * the shape: `lib/` holds one file the root does not.
+ */
+async function checkSelectionFollowsTheProjectFolder(): Promise<void> {
+	const name = 'selection follows the project folder';
+	const folder = vscode.workspace.workspaceFolders?.[0];
+	if (!folder) {
+		record(name, false, 'no workspace folder to configure');
 		return;
 	}
 
+	// The bench's `.vscode/` is gitignored, so a developer's own launch
+	// configuration can be sitting in it and is not this check's to delete.
+	const dotVscode = vscode.Uri.joinPath(folder.uri, '.vscode');
+	const settingsFile = vscode.Uri.joinPath(dotVscode, 'settings.json');
+	const existedBefore = { folder: await exists(dotVscode), file: await exists(settingsFile) };
+
+	const settings = vscode.workspace.getConfiguration(SECTION, folder.uri);
+	// A developer mid-way through checking this feature by hand has one set.
+	const before = settings.inspect(SETTINGS.projectFolder)?.workspaceFolderValue;
 	try {
-		await vscode.commands.executeCommand(COMMANDS.connect);
-		record(name, extension.isActive, `${COMMANDS.connect} returned, isActive=${extension.isActive}`);
+		await settings.update(SETTINGS.projectFolder, 'lib', vscode.ConfigurationTarget.WorkspaceFolder);
+		const project = await resolveProject(folder);
+		const names = project.ok ? (await selectWorkspaceFiles(project.uri)).files.map((file) => file.name) : [];
+		record(name, project.ok && names.join(',') === 'helper.py', `lib/ selected [${names.join(', ')}]`);
+
+		await settings.update(SETTINGS.projectFolder, 'nowhere', vscode.ConfigurationTarget.WorkspaceFolder);
+		const missing = await resolveProject(folder);
+		record(
+			'a project folder that is not there is refused',
+			!missing.ok && missing.problem === 'missing',
+			missing.ok ? 'it resolved anyway' : `problem=${missing.problem}, named=${missing.named}`
+		);
 	} catch (error) {
-		record(name, false, `${COMMANDS.connect} threw: ${String(error)}`);
+		record(name, false, String(error));
 	} finally {
-		// Deleting the shadow puts the prototype's own getter back in view.
-		if (original) Object.defineProperty(navigator, 'usb', original);
-		else Reflect.deleteProperty(navigator, 'usb');
+		// Back to whatever was there, which is usually nothing.
+		await settings
+			.update(SETTINGS.projectFolder, before, vscode.ConfigurationTarget.WorkspaceFolder)
+			.then(undefined, () => undefined);
+
+		// Only what this check made. Neither delete is recursive, so a `.vscode`
+		// that still holds something of somebody else's survives.
+		if (!existedBefore.file) await remove(settingsFile);
+		if (!existedBefore.folder) await remove(dotVscode);
 	}
+}
+
+const exists = (uri: vscode.Uri) =>
+	vscode.workspace.fs.stat(uri).then(
+		() => true,
+		() => false
+	);
+
+const remove = (uri: vscode.Uri) => vscode.workspace.fs.delete(uri).then(undefined, () => undefined);
+
+/**
+ * A host can swap the workspace folder in place, and a root captured once goes
+ * stale with nothing to notice it. Worth checking in a real host because
+ * `vscode-test-web` accepts `updateWorkspaceFolders` and reports the new folder
+ * while never delivering `onDidChangeWorkspaceFolders`: anything that refreshed
+ * itself from that event would pass its own unit tests and be wrong here.
+ */
+async function checkSelectionFollowsTheRoot(): Promise<void> {
+	const original = vscode.workspace.workspaceFolders?.[0]?.uri;
+	if (!original) {
+		record('selection follows a swapped root', false, 'no workspace folder to swap');
+		return;
+	}
+
+	const elsewhere = vscode.Uri.joinPath(original, 'lib');
+	const swapped = vscode.workspace.updateWorkspaceFolders(0, 1, { uri: elsewhere });
+	if (!swapped) {
+		record('selection follows a swapped root', false, 'updateWorkspaceFolders refused the swap');
+		return;
+	}
+
+	// Through `chooseWorkspaceFolder`, because it is what reads `workspaceFolders`
+	// now and so it is what could go stale. One folder means it answers without
+	// putting a quick pick in front of a headless run.
+	const folder = await chooseWorkspaceFolder();
+	if (!folder) {
+		record('selection follows a swapped root', false, 'no root came back after the swap');
+		return;
+	}
+
+	const selection = await selectWorkspaceFiles(folder.uri);
+	const names = selection.files.map((file) => file.name);
+	record(
+		'selection follows a swapped root',
+		names.join(',') === 'helper.py',
+		`after swapping the root to lib/: files=[${names.join(', ')}]`
+	);
+
+	// The root is left swapped. Restoring it would be a second
+	// `updateWorkspaceFolders` without waiting for the change event in between,
+	// which the API says not to do, and the window this runs in is thrown away.
 }
 
 function summarise(): void {

@@ -8,7 +8,8 @@
  *
  * Both run a VS Code downloaded into `.vscode-test/` with an extensions
  * directory of their own, so a session is isolated from the machine's own
- * install and no settings of the developer's are read.
+ * install and no settings of the developer's are read. The interactive profile
+ * is wiped on every launch, so the bench opens as a fresh install each time.
  *
  * `--extensionDevelopmentKind` is deliberately not passed. The manifest declares
  * both `main` and `browser`, so desktop picks `main` and runs this in the Node
@@ -28,6 +29,9 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
 const bench = path.join(root, 'test', 'workspace');
+// The two places a bench profile may live, and the only two this script will ever remove.
+const benchRoot = path.join(root, '.vscode-test');
+const tempPrefix = path.join(os.tmpdir(), 'mbmp-');
 const testing = process.argv.includes('--test');
 const extraExtensions = process.argv.includes('--extra-extensions');
 // `engines.vscode` is the floor, and its node is far older than the @types/node
@@ -35,9 +39,12 @@ const extraExtensions = process.argv.includes('--extra-extensions');
 // Only running there catches that: `--vscode-version=1.91.1`.
 const versionArgument = process.argv.find((argument) => argument.startsWith('--vscode-version='));
 const version = versionArgument?.slice('--vscode-version='.length);
-const serialMonitorArgument = process.argv.find((argument) => argument.startsWith('--serial-monitor-path='));
-const serialMonitorPath = serialMonitorArgument?.slice('--serial-monitor-path='.length);
-const developmentPaths = serialMonitorPath ? [root, path.resolve(serialMonitorPath)] : [root];
+// Other extensions loaded from source beside this one, `--extension=<path>`,
+// repeatable: the manager this extension depends on, a serial companion checkout.
+const alongside = process.argv
+	.filter((argument) => argument.startsWith('--extension='))
+	.map((argument) => path.resolve(root, argument.slice('--extension='.length)));
+const developmentPaths = [root, ...alongside];
 
 /** The limit is on the socket path, so it is the socket that gets measured. */
 const SOCKET_LIMIT = 103;
@@ -65,23 +72,22 @@ const fits = (dir) =>
  * The interactive profile sits beside the downloaded VS Code, unless the
  * checkout is too deep for that to fit the socket limit, in which case it moves
  * to the temp directory under a name derived from the checkout so two clones
- * keep their own settings. Announced, because a profile that silently moved is a
- * setting that silently disappeared.
+ * never share one. Announced, so a profile that moved can still be found.
  */
 function userDataDir() {
 	if (testing) {
 		// Measured before the directory is made, so a TMPDIR too deep for a socket
 		// does not leave an empty profile behind on every failed run.
-		const template = path.join(os.tmpdir(), 'mbmp-test-XXXXXX');
+		const template = `${tempPrefix}test-XXXXXX`;
 		if (!fits(template)) throw tooDeep(template);
-		return fs.mkdtempSync(path.join(os.tmpdir(), 'mbmp-test-'));
+		return fs.mkdtempSync(`${tempPrefix}test-`);
 	}
 
-	const beside = path.join(root, '.vscode-test', 'user-data');
+	const beside = path.join(benchRoot, 'user-data');
 	if (fits(beside)) return beside;
 
 	const key = createHash('sha256').update(root).digest('hex').slice(0, 8);
-	const elsewhere = path.join(os.tmpdir(), `mbmp-${key}`);
+	const elsewhere = `${tempPrefix}${key}`;
 	if (!fits(elsewhere)) throw tooDeep(elsewhere);
 	console.log(`[desktop] ${root} is too deep for a profile beside it, so this session keeps its settings in ${elsewhere}`);
 	return elsewhere;
@@ -98,13 +104,26 @@ const tooDeep = (dir) =>
  * The Copilot sign-in modal is not covered by `--disable-extensions`: it comes
  * from `GitHub.copilot-chat`, which ships as a builtin, and builtins stay
  * enabled. A setting is the only thing that stops it swallowing keystrokes.
- * Never overwrites, so a level raised in a session survives the next launch.
  */
 function seedSettings(dir) {
 	const settings = path.join(dir, 'User', 'settings.json');
 	if (fs.existsSync(settings)) return;
 	fs.mkdirSync(path.dirname(settings), { recursive: true });
 	fs.writeFileSync(settings, `${JSON.stringify({ 'chat.disableAIFeatures': true }, null, '\t')}\n`);
+}
+
+/**
+ * A bench that remembers is a bench that lies: a collapsed section, a chosen
+ * mode or an extension installed last time would all pass for the first run's
+ * behaviour. So every interactive launch starts as a fresh install. Only a
+ * directory under one of the two bench roots above is ever removed, checked by
+ * path. Anything else is refused, whatever asked for it.
+ */
+function freshBenchDir(dir) {
+	if (![benchRoot + path.sep, tempPrefix].some((prefix) => dir.startsWith(prefix))) {
+		throw new Error(`refusing to remove ${dir}: it is not a bench directory of this script's making`);
+	}
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }
 
 /** Launched from VS Code's own terminal, the inherited VSCODE_* vars reach the
@@ -127,13 +146,15 @@ function clearedVscodeVars() {
 }
 
 const profile = userDataDir();
-seedSettings(profile);
-
 // Alongside the user data for a test run, so both are thrown away together: an
 // extension installed during an interactive session must not reach the tests.
-const extensionsDir = testing
-	? path.join(profile, 'extensions')
-	: path.join(root, '.vscode-test', 'extensions');
+const extensionsDir = testing ? path.join(profile, 'extensions') : path.join(benchRoot, 'extensions');
+// A test profile is brand new already; the interactive one is made so here.
+if (!testing) {
+	for (const dir of [profile, extensionsDir]) freshBenchDir(dir);
+	console.log(`[desktop] fresh profile at ${profile}`);
+}
+seedSettings(profile);
 
 // The ids come from our own manifest, so there is one list rather than two.
 if (extraExtensions) {
@@ -187,5 +208,11 @@ if (testing) {
 		...developmentPaths.map((developmentPath) => `--extensionDevelopmentPath=${developmentPath}`),
 		...launchArgs,
 	];
-	spawn(executable, args, { stdio: 'inherit', env: cleanEnv() }).on('exit', (status) => process.exit(status ?? 0));
+	/**
+	 * Exit as the child did. A signal death carries no status, so reporting 0 there would call a
+	 * crash a clean run, and 128 plus the signal is what a shell reports: SIGSEGV reads as 139.
+	 */
+	const exitAs = (status, signal) => process.exit(signal ? 128 + (os.constants.signals[signal] ?? 0) : (status ?? 0));
+
+	spawn(executable, args, { stdio: 'inherit', env: cleanEnv() }).on('exit', exitAs);
 }
