@@ -4,7 +4,7 @@
  * what is not guaranteed is that they are the API this extension was built
  * against, and the manager is what decides that when the mode registers.
  */
-import type { MicrobitManagerApi, Mode } from 'bbcmicrobit-manager-api';
+import type { MicrobitManagerApi, Mode } from 'vscode-bbcmicrobit-manager-api';
 import * as vscode from 'vscode';
 
 import { MANAGER_EXTENSION, PRODUCT, REFUSED_CONTEXT } from '../config';

@@ -5,6 +5,7 @@
 - The micro:bit panel moved to use the vscode-microbit-manager extension.
   This extension manages the WebUSB connection, desktop flashing and terminal
   connections.
+- Added combined `npm run test:all` command to run all tests.
 
 ## v0.2.0 - 2026/09/04
 

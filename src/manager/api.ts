@@ -7,7 +7,7 @@
  * here, where it would be taken for missing. `commands.switchMode` arrived
  * later, and is only used once registered, which means a manager new enough.
  */
-import type { MicrobitManagerApi } from 'bbcmicrobit-manager-api';
+import type { MicrobitManagerApi } from 'vscode-bbcmicrobit-manager-api';
 
 const NEEDED = ['registerMode', 'activeMode', 'connect', 'flashHex', 'saveHex'] as const;
 const NEEDED_COMMANDS = ['openTerminal'] as const;

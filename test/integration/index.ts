@@ -1,5 +1,5 @@
 import { microbitBoardId } from '@microbit/microbit-fs';
-import type { BoardInfo, HexSource, MicrobitManagerApi } from 'bbcmicrobit-manager-api';
+import type { BoardInfo, HexSource, MicrobitManagerApi } from 'vscode-bbcmicrobit-manager-api';
 import * as vscode from 'vscode';
 
 import type { ExtensionApi } from '../../src/activate';
@@ -306,7 +306,7 @@ async function checkTheManagerAcceptedTheMode(exported: ExtensionApi | undefined
 		record(
 			'the manager extension is loaded beside this one',
 			false,
-			`${MANAGER_EXTENSION} is not loaded. The harness passes ../vscode-microbit-manager with --extensionPath on web and --extension on desktop.`
+			`${MANAGER_EXTENSION} is not loaded. The harness unpacks it into .vscode-test/manager and passes that folder to both hosts.`
 		);
 		return undefined;
 	}

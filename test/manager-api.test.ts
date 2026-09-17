@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import types from 'bbcmicrobit-manager-api/package.json';
+import types from 'vscode-bbcmicrobit-manager-api/package.json';
 import { MANAGER_API_VERSION } from '../src/config';
 import { isManagerApi } from '../src/manager/api';
 

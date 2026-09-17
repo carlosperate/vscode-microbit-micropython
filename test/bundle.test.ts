@@ -107,7 +107,7 @@ it.each(boardAccess)('neither extension bundle carries %s', (pattern) => {
  * bundle: a value imported from it would be the day it stopped being types-only.
  */
 it.each(BOTH)('the %s bundle carries nothing from the manager API package', (which) => {
-	expect(bundleFor(which)).not.toMatch(/bbcmicrobit-manager-api/);
+	expect(bundleFor(which)).not.toMatch(/vscode-bbcmicrobit-manager-api/);
 });
 
 /**

@@ -4,7 +4,7 @@
  * status bar menu offers while this is the active mode. The views themselves are
  * the manifest's, gated on the key the manager sets for this mode.
  */
-import type { Mode } from 'bbcmicrobit-manager-api';
+import type { Mode } from 'vscode-bbcmicrobit-manager-api';
 import * as vscode from 'vscode';
 
 import { COMMANDS, EXTENSION_ID, MANAGER_API_VERSION, MODE_ID, MODE_LABEL, SECTION, SETTINGS } from '../config';
