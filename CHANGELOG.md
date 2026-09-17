@@ -1,6 +1,6 @@
 # Release Notes
 
-## v0.3.0 - Unreleased
+## v0.3.0 - 2026/09/17
 
 - The micro:bit panel moved to use the vscode-microbit-manager extension.
   This extension manages the WebUSB connection, desktop flashing and terminal
