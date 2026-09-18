@@ -37,7 +37,7 @@
     "esbuild": "^0.28.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11",
-    "vscode-bbcmicrobit-manager-api": "0.2.0"
+    "vscode-bbcmicrobit-manager-api": "0.3.0"
   },
   "engines": {
     "vscode": "^1.91.0"
@@ -102,7 +102,7 @@
     "commands": [
       {
         "command": "bbcmicrobit-micropython.flash",
-        "title": "Flash Project",
+        "title": "Flash MicroPython Project",
         "category": "BBC micro:bit MicroPython"
       },
       {
@@ -112,7 +112,7 @@
       },
       {
         "command": "bbcmicrobit-micropython.selectProjectFolder",
-        "title": "Select Project Folder",
+        "title": "Select MicroPython Project Folder",
         "category": "BBC micro:bit MicroPython"
       },
       {
@@ -131,14 +131,22 @@
         "category": "BBC micro:bit MicroPython"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "bbcmicrobit-micropython",
+          "title": "BBC micro:bit MicroPython",
+          "icon": "assets/activitybar.svg"
+        }
+      ]
+    },
     "views": {
-      "bbcmicrobit": [
+      "bbcmicrobit-micropython": [
         {
           "id": "bbcmicrobit-micropython.simulator",
-          "name": "MicroPython",
+          "name": "BBC micro:bit MicroPython",
           "type": "webview",
-          "icon": "assets/activitybar.svg",
-          "when": "bbcmicrobit-manager.activeMode == micropython || (bbcmicrobit-micropython.refused && bbcmicrobit-manager.noModes)"
+          "icon": "assets/activitybar.svg"
         }
       ]
     }

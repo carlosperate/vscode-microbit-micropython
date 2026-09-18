@@ -5,12 +5,10 @@ import * as vscode from 'vscode';
 import type { ExtensionApi } from '../../src/activate';
 import { flash } from '../../src/commands/flash';
 import {
-	COMMANDS,
 	CONTAINER_ID,
 	EXTENSION_ID,
+	MANAGER_API_VERSION,
 	MANAGER_EXTENSION,
-	MODE_ID,
-	MODE_WHEN,
 	PRODUCT,
 	SECTION,
 	SERIAL_MONITOR_EXTENSION,
@@ -19,8 +17,7 @@ import {
 import { chooseWorkspaceFolder, resolveProject, selectWorkspaceFiles } from '../../src/files/workspace';
 import { readFirmware } from '../../src/hex/assets';
 import { buildFs, generateHex } from '../../src/hex/build';
-import { isManagerApi } from '../../src/manager/api';
-import { claimsWorkspace } from '../../src/manager/mode';
+import { checkManager } from '../../src/manager/api';
 import { readSimulatorHtml } from '../../src/simulator/assets';
 import { commandFor } from '../../src/simulator/controls';
 import { SHELL_CONTROLS } from '../../src/simulator/protocol';
@@ -31,7 +28,7 @@ import { VIEW_ID } from '../../src/simulator/view';
  * a browser and `@vscode/test-electron` on the desktop. It exists for the things
  * a stubbed `vscode` cannot see, above all whether the manifest and the code
  * agree about what this extension contributes, and whether the manager this
- * extension depends on accepted its mode.
+ * extension depends on serves the API it was built against.
  *
  * Every check reports before it asserts, so a failing run says which assumption
  * broke rather than stopping at the first one.
@@ -68,15 +65,13 @@ export async function run(): Promise<void> {
 	checkTheHostLoadedItsOwnEntry(exported);
 	await checkBothEntriesShip(extension);
 	await checkTheSimulatorShips(extension);
-	checkTheViewsJoinTheSharedPanel(extension);
+	await checkTheSidebarIsItsOwn(extension);
 	checkItRunsBesideTheHardware(extension);
 	await checkContributedCommandsResolve(extension);
 	checkEveryCommandSaysWhoOwnsIt(extension);
 	await checkSerialMonitorCompanion();
-	const manager = await checkTheManagerAcceptedTheMode(exported);
+	const manager = await checkTheManagerIsLinked(exported);
 	await checkTheDocumentButtonsRunRealCommands(manager);
-	await checkOpeningTheSimulatorMakesThisTheMode(manager);
-	await checkTheWorkspaceIsClaimed();
 	await checkSelectionOnTheRealWorkspace();
 	const built = await checkHexBuildsFromTheRealWorkspace(extension);
 	if (built) await checkTheHexSurvivesBeingSaved(built);
@@ -167,33 +162,34 @@ async function checkTheSimulatorShips(extension: vscode.Extension<unknown>): Pro
 }
 
 /**
- * The view goes into the container the manager declares, gated on the key it
- * sets for this mode. A container id that does not resolve sends it to the
- * Explorer with nothing but a log line, and a view without the clause would stay
- * visible inside every other mode. Both are manifest strings the workbench
- * interprets, so nothing else notices a typo.
+ * The simulator's view in this extension's own container, with no `when`. A
+ * container id that does not resolve sends the view to the Explorer with nothing
+ * but a log line, and the workbench registers a `.focus` command per view and
+ * container only once it has accepted them, so this asks it rather than the JSON.
  */
-function checkTheViewsJoinTheSharedPanel(extension: vscode.Extension<unknown>): void {
-	const containers: unknown[] = extension.packageJSON?.contributes?.viewsContainers?.activitybar ?? [];
-	record(
-		'no container of our own is declared',
-		containers.length === 0,
-		containers.length ? `declares ${JSON.stringify(containers)}` : 'the manager owns the only one'
-	);
-
-	// One view, because the workbench splits a section's height equally between a
-	// non-owner's views; the buttons are drawn inside the simulator's document.
+async function checkTheSidebarIsItsOwn(extension: vscode.Extension<unknown>): Promise<void> {
+	const containers: { id?: string; title?: string }[] = extension.packageJSON?.contributes?.viewsContainers?.activitybar ?? [];
 	const views: { id?: string; type?: string; when?: string }[] =
 		extension.packageJSON?.contributes?.views?.[CONTAINER_ID] ?? [];
 	record(
-		'the simulator is the one view in the shared container',
-		views.length === 1 && views[0]?.id === VIEW_ID && views[0]?.type === 'webview',
-		`${CONTAINER_ID} holds ${views.map((entry) => entry.id).join(' then ') || 'nothing'}`
+		'the simulator is the one view in a container of our own',
+		containers.length === 1 &&
+			containers[0]?.title === PRODUCT &&
+			views.length === 1 &&
+			views[0]?.id === VIEW_ID &&
+			views[0]?.type === 'webview' &&
+			views[0]?.when === undefined,
+		`${containers.map((entry) => `${entry.id} "${entry.title}"`).join(', ') || 'no container'} holds ` +
+			`${views.map((view) => `${view.id} when ${view.when ?? 'always'}`).join(', ') || 'nothing'}`
 	);
+
+	const registered = await vscode.commands.getCommands(true);
+	const expected = [`workbench.view.extension.${CONTAINER_ID}`, `${VIEW_ID}.focus`];
+	const missing = expected.filter((command) => !registered.includes(command));
 	record(
-		'every view is gated on the mode key the manager sets',
-		views.length > 0 && views.every((view) => view.when === MODE_WHEN),
-		views.map((view) => `${view.id} when ${view.when ?? 'always'}`).join('; ')
+		'the workbench registered the container and the view',
+		missing.length === 0,
+		missing.length ? `missing: ${missing.join(', ')}` : expected.join(', ')
 	);
 }
 
@@ -296,11 +292,10 @@ async function waitForCommand(command: string): Promise<boolean> {
 
 /**
  * The seam the split created, and the only place it can be seen: the manager is
- * loaded, its exports are the API this extension was built against, and it
- * accepted the mode, which is what puts our views in its panel. Its absence is
- * a harness fault and is reported as one.
+ * loaded, it serves the API this extension was built against, and it took this
+ * extension's menu group. Its absence is a harness fault and is reported as one.
  */
-async function checkTheManagerAcceptedTheMode(exported: ExtensionApi | undefined): Promise<MicrobitManagerApi | undefined> {
+async function checkTheManagerIsLinked(exported: ExtensionApi | undefined): Promise<MicrobitManagerApi | undefined> {
 	const manager = vscode.extensions.getExtension(MANAGER_EXTENSION);
 	if (!manager) {
 		record(
@@ -318,24 +313,20 @@ async function checkTheManagerAcceptedTheMode(exported: ExtensionApi | undefined
 		record('the manager extension activates', false, `activate() threw: ${String(error)}`);
 		return undefined;
 	}
+	const check = checkManager(api, MANAGER_API_VERSION);
 	record(
-		"the manager's exports are the API this extension was built against",
-		isManagerApi(api),
-		isManagerApi(api) ? `version ${api.version}` : `exports=${typeof api}`
+		'the manager serves the API this extension was built against',
+		check.kind === 'accepted',
+		`${check.kind}, this needs ${MANAGER_API_VERSION}${check.kind === 'accepted' ? '' : `, problem: ${String(exported?.manager.problem)}`}`
 	);
-	if (!isManagerApi(api)) return undefined;
+	if (check.kind !== 'accepted') return undefined;
 
 	record(
-		'the manager accepted the mode',
+		'the manager took the menu group',
 		exported?.manager.registered === true,
-		`registered=${String(exported?.manager.registered)}${exported?.manager.problem ? `, problem: ${exported.manager.problem}` : ''}`
+		`registered=${String(exported?.manager.registered)}, API ${check.api.version}`
 	);
-	record(
-		'MicroPython is the active mode, being the only one',
-		api.activeMode() === MODE_ID,
-		`activeMode()=${String(api.activeMode())}`
-	);
-	return api;
+	return check.api;
 }
 
 /**
@@ -357,44 +348,6 @@ async function checkTheDocumentButtonsRunRealCommands(manager: MicrobitManagerAp
 			unknown.length ? `; unknown: ${unknown.map((entry) => entry.command).join(', ')}` : ''
 		}`
 	);
-}
-
-/**
- * A view gated out of the panel cannot be revealed, so a simulator command run
- * while another mode is active first makes this the mode, through the manager's
- * own switch, as if the user had chosen it. A throwaway second mode stands in
- * for the other one.
- */
-async function checkOpeningTheSimulatorMakesThisTheMode(manager: MicrobitManagerApi | undefined): Promise<void> {
-	if (!manager) return;
-	const other = manager.registerMode({
-		apiVersion: '0.1.0',
-		id: 'other',
-		extensionId: 'bbcmicrobit-test.other',
-		label: 'Other',
-	});
-	try {
-		await vscode.commands.executeCommand(manager.commands.switchMode, 'other');
-		const before = manager.activeMode();
-		await vscode.commands.executeCommand(COMMANDS.openSimulator);
-		record(
-			'Open Simulator makes MicroPython the active mode when another was',
-			before === 'other' && manager.activeMode() === MODE_ID,
-			`before=${String(before)}, after=${String(manager.activeMode())}`
-		);
-	} finally {
-		other.dispose();
-	}
-}
-
-/** The bench holds `main.py`, so the mode claims it; that is what seeds the switcher in a Python workspace. */
-async function checkTheWorkspaceIsClaimed(): Promise<void> {
-	try {
-		const claimed = await claimsWorkspace();
-		record('a workspace holding Python files is claimed', claimed, `claimsWorkspace()=${String(claimed)}`);
-	} catch (error) {
-		record('a workspace holding Python files is claimed', false, String(error));
-	}
 }
 
 /**

@@ -1,5 +1,12 @@
 # Release Notes
 
+## v0.4.0 - Unreleased
+
+- MicroPython has its own icon in the activity bar and its own side bar, the
+  full height of the window. Its commands are still in the micro:bit menu in
+  the status bar.
+- Needs BBC micro:bit Manager v0.2.0 or later.
+
 ## v0.3.0 - 2026/09/17
 
 - The micro:bit panel moved to use the vscode-microbit-manager extension.

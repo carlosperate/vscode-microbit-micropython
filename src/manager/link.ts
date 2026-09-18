@@ -1,76 +1,91 @@
 /**
  * The link to the BBC micro:bit Manager. The dependency in the manifest
  * guarantees it activated first, so its exports are there without an await;
- * what is not guaranteed is that they are the API this extension was built
- * against, and the manager is what decides that when the mode registers.
+ * what is not guaranteed is their version, which this side checks.
  */
-import type { MicrobitManagerApi, Mode } from 'vscode-bbcmicrobit-manager-api';
+import type { MenuGroup, MicrobitManagerApi } from 'vscode-bbcmicrobit-manager-api';
 import * as vscode from 'vscode';
 
-import { MANAGER_EXTENSION, PRODUCT, REFUSED_CONTEXT } from '../config';
+import { EXTENSION_ID, MANAGER_API_VERSION, MANAGER_EXTENSION, PRODUCT } from '../config';
 import { log } from '../log';
-import { isManagerApi } from './api';
+import { checkManager, type ManagerCheck } from './api';
 
 export interface ManagerStatus {
+	/** Whether the status bar menu lists this extension's commands. */
 	readonly registered: boolean;
 	/** Why the board cannot be reached from here, when it cannot. */
 	readonly problem: string | undefined;
 }
 
 export interface ManagerLink {
-	/** The API once the mode is registered with it. Undefined has already been explained. */
+	/** The API once its version is accepted. Undefined has already been explained. */
 	api(): MicrobitManagerApi | undefined;
 	readonly status: ManagerStatus;
 }
 
 const SHOW_EXTENSION = 'Show Extension';
 
-export function linkManager(context: vscode.ExtensionContext, mode: Mode): ManagerLink {
+export function linkManager(context: vscode.ExtensionContext, group: MenuGroup): ManagerLink {
+	const check = checkManager(vscode.extensions.getExtension(MANAGER_EXTENSION)?.exports, MANAGER_API_VERSION);
 	const status: { registered: boolean; problem: string | undefined } = { registered: false, problem: undefined };
-	const exports: unknown = vscode.extensions.getExtension(MANAGER_EXTENSION)?.exports;
-	const api = isManagerApi(exports) ? exports : undefined;
 
-	if (!api) {
-		status.problem = 'the BBC micro:bit Manager extension is not running, and it is what talks to the board.';
-		log(status.problem);
-		// Nobody else will say so: the manager's own message needs the manager.
-		explain(status.problem);
-		refused();
-	} else {
+	if (check.kind === 'accepted') {
 		try {
-			context.subscriptions.push(api.registerMode(mode));
+			context.subscriptions.push(check.api.registerMenuGroup(group));
 			status.registered = true;
-			log(`Registered the ${mode.label} mode with the micro:bit Manager, API ${api.version}`);
+			log(`Linked to the micro:bit Manager, API ${check.api.version}`);
 		} catch (error) {
-			// The manager has already shown which extension to update; this side only remembers.
-			status.problem = `the BBC micro:bit Manager refused this extension. ${describe(error)}`;
-			log(status.problem);
-			refused();
+			// This extension's own defect, and the board still works without the menu entries.
+			log(`The micro:bit Manager refused the menu group: ${String(error)}`);
 		}
+	} else {
+		status.problem = describe(check).problem;
+		log(status.problem);
+		// The manager refuses nobody, so nothing else will say so.
+		explain(check);
 	}
 
 	return {
 		api: () => {
-			if (status.registered && api) return api;
-			explain(status.problem ?? 'the BBC micro:bit Manager extension is not available.');
+			if (check.kind === 'accepted') return check.api;
+			explain(check);
 			return undefined;
 		},
 		status,
 	};
 }
 
-const describe = (error: unknown) => (error instanceof Error ? error.message : String(error));
+type Refusal = Exclude<ManagerCheck, { kind: 'accepted' }>;
 
-/** The simulator needs no board, so the view shows where the panel would otherwise be bare. */
-function refused(): void {
-	void vscode.commands
-		.executeCommand('setContext', REFUSED_CONTEXT, true)
-		.then(undefined, (error: unknown) => log(`Could not set ${REFUSED_CONTEXT}: ${String(error)}`));
+function describe(check: Refusal): { problem: string; update: string } {
+	switch (check.kind) {
+		case 'missing':
+			return {
+				// The declared dependency means the manager is running; its exports are what went wrong.
+				problem: 'the BBC micro:bit Manager did not provide an API this extension can use, and it is what talks to the board.',
+				update: MANAGER_EXTENSION,
+			};
+		case 'update-manager':
+			return {
+				problem:
+					'this needs a newer BBC micro:bit Manager to reach the board. ' +
+					`(The manager serves API ${check.served}, this needs ${MANAGER_API_VERSION}.)`,
+				update: MANAGER_EXTENSION,
+			};
+		case 'update-extension':
+			return {
+				problem:
+					`the BBC micro:bit Manager installed is newer than this extension supports. Update ${PRODUCT} to reach the board. ` +
+					`(The manager serves API ${check.served}, this was built for ${MANAGER_API_VERSION}.)`,
+				update: EXTENSION_ID,
+			};
+	}
 }
 
-function explain(problem: string): void {
+function explain(check: Refusal): void {
+	const { problem, update } = describe(check);
 	void vscode.window
 		.showErrorMessage(`${PRODUCT}: ${problem}`, SHOW_EXTENSION)
-		.then((picked) => (picked ? vscode.commands.executeCommand('extension.open', MANAGER_EXTENSION) : undefined))
+		.then((picked) => (picked ? vscode.commands.executeCommand('extension.open', update) : undefined))
 		.then(undefined, (error: unknown) => log(`Could not show the manager problem: ${String(error)}`));
 }

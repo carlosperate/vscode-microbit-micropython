@@ -12,7 +12,7 @@ import { selectProjectFolder } from './commands/selectProjectFolder';
 import { COMMANDS, type CommandId } from './config';
 import { createLog, log } from './log';
 import { linkManager, type ManagerStatus } from './manager/link';
-import { createMode } from './manager/mode';
+import { menuGroup } from './manager/menu';
 import { createSerialMonitor } from './serial/eclipse';
 import { filesForSimulator, openSimulator, openSimulatorTerminal, runInSimulator } from './simulator/commands';
 import { createSimulator } from './simulator/view';
@@ -32,9 +32,7 @@ export function activateHost(context: vscode.ExtensionContext, entry: Entry): Ex
 	log(`Extension activated, ${entry} entry`);
 
 	createSerialMonitor(context);
-	// Registering is what puts this extension's view in the shared panel: the
-	// manager sets the context key it is gated on, and nothing else does.
-	const manager = linkManager(context, createMode(context));
+	const manager = linkManager(context, menuGroup(context));
 	const simulator = createSimulator(context, () => filesForSimulator(context), manager);
 
 	const implemented: Record<CommandId, CommandHandler> = {

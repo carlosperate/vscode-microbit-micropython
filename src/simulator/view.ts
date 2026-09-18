@@ -4,7 +4,7 @@
  */
 import * as vscode from 'vscode';
 
-import { MODE_ID, PRODUCT } from '../config';
+import { PRODUCT } from '../config';
 import { log } from '../log';
 import type { ManagerLink } from '../manager/link';
 import type { SerialTransport } from '../serial/types';
@@ -178,12 +178,6 @@ export function createSimulator(
 	context.subscriptions.push(registration);
 
 	async function show(): Promise<void> {
-		// The view is gated on this being the active mode, and a gated-out view
-		// cannot be revealed, so a simulator command is the user asking for MicroPython.
-		if (manager.status.registered) {
-			const api = manager.api();
-			if (api && api.activeMode() !== MODE_ID) await vscode.commands.executeCommand(api.commands.switchMode, MODE_ID);
-		}
 		// `<viewId>.focus` is VS Code's own, and the only way to reveal a view
 		// that has never been resolved and so has no `show()` to call.
 		if (!current) {

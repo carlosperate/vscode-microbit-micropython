@@ -122,7 +122,7 @@ export async function buildHex(
  * setting, what it currently says, and the two ways to change it.
  */
 function explainProject(problem: Problem, named: string): string {
-	const fix = `Set ${settingId(SETTINGS.projectFolder)}, or run "${PRODUCT}: Select Project Folder".`;
+	const fix = `Set ${settingId(SETTINGS.projectFolder)}, or run "${PRODUCT}: Select MicroPython Project Folder".`;
 	switch (problem) {
 		case 'not-a-string':
 			return `${settingId(SETTINGS.projectFolder)} has to be a folder path. ${fix}`;

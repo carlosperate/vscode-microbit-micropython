@@ -1,26 +1,30 @@
 /**
- * The shape this extension needs of whatever the manager exported, checked
- * rather than trusted: the dependency carries no version range, so the object
- * on the other side is whichever version the gallery installed. Checked against
- * the shape every version has had, so a manager that is too old fails at
- * `registerMode`, where the manager names which extension to update, rather than
- * here, where it would be taken for missing. `commands.switchMode` arrived
- * later, and is only used once registered, which means a manager new enough.
+ * Whether the manager's exports are an API this extension can use. The manager
+ * refuses nobody, so this is the one place a mismatch is noticed. Compatible is
+ * npm's caret: at or above ours, same major, and same minor below 1.0.0.
  */
 import type { MicrobitManagerApi } from 'vscode-bbcmicrobit-manager-api';
 
-const NEEDED = ['registerMode', 'activeMode', 'connect', 'flashHex', 'saveHex'] as const;
-const NEEDED_COMMANDS = ['openTerminal'] as const;
+export type ManagerCheck =
+	| { readonly kind: 'accepted'; readonly api: MicrobitManagerApi }
+	| { readonly kind: 'missing' }
+	| { readonly kind: 'update-manager'; readonly served: string }
+	| { readonly kind: 'update-extension'; readonly served: string };
 
-export function isManagerApi(candidate: unknown): candidate is MicrobitManagerApi {
-	if (typeof candidate !== 'object' || candidate === null) return false;
-	const api = candidate as Record<string, unknown>;
-	const commands = api.commands as Record<string, unknown> | undefined;
-	return (
-		typeof api.version === 'string' &&
-		NEEDED.every((member) => typeof api[member] === 'function') &&
-		typeof commands === 'object' &&
-		commands !== null &&
-		NEEDED_COMMANDS.every((command) => typeof commands[command] === 'string')
-	);
+export function checkManager(candidate: unknown, wanted: string): ManagerCheck {
+	const served = typeof candidate === 'object' && candidate !== null ? (candidate as { version?: unknown }).version : undefined;
+	const have = parse(served);
+	const need = parse(wanted);
+	if (typeof served !== 'string' || !have || !need) return { kind: 'missing' };
+	if (compare(have, need) < 0) return { kind: 'update-manager', served };
+	if (breaking(have) !== breaking(need)) return { kind: 'update-extension', served };
+	return { kind: 'accepted', api: candidate as MicrobitManagerApi };
 }
+
+const parse = (version: unknown): number[] | undefined =>
+	typeof version === 'string' && /^\d+\.\d+\.\d+$/.test(version) ? version.split('.').map(Number) : undefined;
+
+const compare = (a: number[], b: number[]): number => a.map((part, at) => part - (b[at] ?? 0)).find((diff) => diff !== 0) ?? 0;
+
+/** The part of a version whose change breaks callers: the major, or below 1.0.0 the minor too. */
+const breaking = (version: number[]): string => version.slice(0, version[0] === 0 ? 2 : 1).join('.');

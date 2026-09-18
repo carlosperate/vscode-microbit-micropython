@@ -3,7 +3,8 @@
 Build and flash a MicroPython project to a BBC micro:bit, connect to the device
 serial and REPL, or run your code in the built-in simulator 🐍🤖.
 
-Works on both desktop and web versions of VS Code and compatible editors.
+Works on VS Code and its web versions ([vscode.dev](https://vscode.dev)), in
+compatible editors, and without any additional local dependencies.
 
 <p align="center">
   <img src="assets/screenshot.png" alt="Extension screenshot" width="75%" align="center"/>
@@ -16,14 +17,14 @@ https://github.com/carlosperate/vscode-microbit-micropython/issues
 ## How to use it
 
 1. Write your code in `main.py` (or any file in your project folder).
-2. Click the **micro:bit** icon in the activity bar on the side and press
-  play on the board there, your code will run on the simulator.
+2. Click the **BBC micro:bit MicroPython** icon in the activity bar on the side and
+  press play on the board there, your code will run on the simulator.
 3. To run it on a real board, plug in your micro:bit with a USB cable.
-4. Click the **Flash Project** button.
+4. Click the **Flash project** button.
 5. Using non-Chromium browsers? Click on the micro:bit icon in the status bar
   at the bottom and choose **Save Hex** instead, then drag the saved
   file onto the `MICROBIT` drive that appears when you plug in the board.
-6. To talk to the board, click **Serial Terminal** in the same panel, or choose
+6. To talk to the board, click **Serial terminal** in the same panel, or choose
   **Open Serial Terminal** from the status bar menu.
   Press `Ctrl+C` to interrupt the running program and get a MicroPython prompt.
 
@@ -31,11 +32,11 @@ https://github.com/carlosperate/vscode-microbit-micropython/issues
 
 - **Run in Simulator:** Run your project on a simulated micro:bit in the side
   bar.
-- **Flash Project:** Build a MicroPython hex from your project folder and send
+- **Flash project:** Build a MicroPython hex from your project folder and send
   it to a connected micro:bit.
   In a Chromium based browser this goes over WebUSB, in desktop VS Code it uses
   the `MICROBIT` USB drive.
-- **Serial Terminal:** Access the MicroPython REPL from the board, inside a
+- **Serial terminal:** Access the MicroPython REPL from the board, inside a
   VS Code terminal.
 - **Save Hex:** Builds a hex from your workspace and MicroPython, the same way
   the micro:bit's online Python editor does, and saves it. You can copy this
@@ -43,8 +44,9 @@ https://github.com/carlosperate/vscode-microbit-micropython/issues
 
 The [BBC micro:bit Manager](https://open-vsx.org/extension/carlosperate/bbcmicrobit-manager)
 extension is installed automatically with this one. It owns the connection to
-the board and the shared micro:bit panel, which other micro:bit extensions use
-too.
+the board and the micro:bit menu in the status bar, which lists this
+extension's commands too. It has its own icon in the activity bar, beside this
+extension's.
 
 ## Your project folder
 
@@ -54,11 +56,11 @@ folders, dot files, and `.hex` files.
 The micro:bit internal filesystem is flat, so it cannot contain folders.
 
 The project folder is the whole workspace by default. If your code lives in a
-subfolder, run the **Select Project Folder** command to select it.
+subfolder, run the **Select MicroPython Project Folder** command to select it.
 
 ## What works where
 
-| | Simulator | Flash Project | Serial REPL | Save Hex |
+| | Simulator | Flash project | Serial REPL | Save Hex |
 |---|---|---|---|---|
 | Desktop VS Code | ✅ | ✅ copies to the `MICROBIT` drive | ✅ native serial port | ✅ |
 | Chrome, Edge and other Chromium browsers | ✅ | ✅ WebUSB | ✅ WebUSB | ✅ |

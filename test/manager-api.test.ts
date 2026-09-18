@@ -2,53 +2,53 @@ import { describe, expect, it } from 'vitest';
 
 import types from 'vscode-bbcmicrobit-manager-api/package.json';
 import { MANAGER_API_VERSION } from '../src/config';
-import { isManagerApi } from '../src/manager/api';
+import { checkManager } from '../src/manager/api';
 
-/** The shape every manager has exported, without the members later versions added. */
-const api = () => ({
-	version: '0.1.0',
-	registerMode: () => ({ dispose() {} }),
-	activeMode: () => undefined,
-	connect: async () => undefined,
-	flashHex: async () => true,
-	saveHex: async () => true,
-	commands: { openTerminal: 'bbcmicrobit-manager.openTerminal' },
-});
+const served = (version: unknown) => ({ version, registerMenuGroup: () => ({ dispose() {} }) });
+const kind = (candidate: unknown, wanted = '0.3.0') => checkManager(candidate, wanted).kind;
 
-describe('recognising the manager API', () => {
-	it('accepts an object with a version, the calls this extension makes and the terminal id', () => {
-		expect(isManagerApi(api())).toBe(true);
+describe('checking the manager API version', () => {
+	it('accepts the version it was built against, and a later one that cannot break it', () => {
+		expect(kind(served('0.3.0'))).toBe('accepted');
+		expect(kind(served('0.3.1'))).toBe('accepted');
+		expect(kind(served('1.4.0'), '1.2.0')).toBe('accepted');
 	});
 
-	/**
-	 * A manager too old for this extension still has this shape, and must be
-	 * refused by `registerMode`, which names the extension to update, rather than
-	 * here, which would call it missing.
-	 */
-	it('accepts a manager older than the version this extension declares', () => {
-		expect(isManagerApi({ ...api(), version: '0.1.0' })).toBe(true);
+	it('hands back the object it accepted', () => {
+		const api = served('0.3.0');
+		const check = checkManager(api, '0.3.0');
+		expect(check.kind === 'accepted' && check.api).toBe(api);
 	});
 
-	it('refuses an object missing any of them', () => {
-		for (const member of ['version', 'registerMode', 'activeMode', 'connect', 'flashHex', 'saveHex', 'commands'] as const) {
-			const partial: Record<string, unknown> = api();
-			delete partial[member];
-			expect(isManagerApi(partial), member).toBe(false);
-		}
-		expect(isManagerApi({ ...api(), commands: {} })).toBe(false);
+	/** An older manager lacks what this extension calls, so the manager is the one to update. */
+	it('asks for a newer manager when the manager is older', () => {
+		expect(checkManager(served('0.2.0'), '0.3.0')).toEqual({ kind: 'update-manager', served: '0.2.0' });
+		expect(kind(served('0.3.0'), '0.3.1')).toBe('update-manager');
+		expect(kind(served('0.9.9'), '1.0.0')).toBe('update-manager');
+		expect(kind(served('1.0.0'), '1.2.0')).toBe('update-manager');
 	});
 
-	it('refuses anything that is not an object', () => {
-		expect(isManagerApi(undefined)).toBe(false);
-		expect(isManagerApi(null)).toBe(false);
-		expect(isManagerApi('0.1.0')).toBe(false);
+	/** Below 1.0.0 a minor may remove a call this extension makes, so it counts as breaking. */
+	it('asks for a newer extension when the manager is a breaking version ahead', () => {
+		expect(checkManager(served('0.4.0'), '0.3.0')).toEqual({ kind: 'update-extension', served: '0.4.0' });
+		expect(kind(served('1.0.0'), '0.3.0')).toBe('update-extension');
+		expect(kind(served('2.0.0'), '1.5.0')).toBe('update-extension');
+	});
+
+	it('calls anything without a version it can read missing', () => {
+		expect(kind(undefined)).toBe('missing');
+		expect(kind(null)).toBe('missing');
+		expect(kind('0.3.0')).toBe('missing');
+		expect(kind({})).toBe('missing');
+		expect(kind(served(3))).toBe('missing');
+		expect(kind(served('0.3'))).toBe('missing');
 	});
 });
 
 /**
- * The version this extension declares is a version of the types package, and
- * the two are bumped by hand in different files.
+ * The version this extension compares against is a version of the types
+ * package, and the two are bumped by hand in different files.
  */
-it('declares the API version of the types it was built against', () => {
+it('compares against the API version of the types it was built against', () => {
 	expect(MANAGER_API_VERSION).toBe(types.version);
 });

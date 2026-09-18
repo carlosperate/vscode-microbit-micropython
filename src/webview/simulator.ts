@@ -190,10 +190,10 @@ function boardRow(): HTMLElement {
 	row.className = 'board';
 	row.setAttribute('role', 'group');
 	row.setAttribute('aria-label', 'micro:bit');
-	const flash = button('Flash Project', () => send({ kind: 'control', control: 'flash' }));
+	const flash = button('Flash project', () => send({ kind: 'control', control: 'flash' }));
 	flash.title = 'Build a MicroPython hex from the project folder and flash it to a connected micro:bit.';
 	flash.prepend(icon(ZAP));
-	const serial = button('Serial Terminal', () => send({ kind: 'control', control: 'serial' }));
+	const serial = button('Serial terminal', () => send({ kind: 'control', control: 'serial' }));
 	serial.title = 'Open a serial terminal on a connected micro:bit.';
 	serial.prepend(icon(TERMINAL));
 	row.append(flash, serial);

@@ -14,7 +14,7 @@ export const COMMANDS = {
 
 export type CommandId = (typeof COMMANDS)[keyof typeof COMMANDS];
 
-/** This extension's own id, which is what it registers its mode under. */
+/** This extension's own id, whose page a message opens when this is the extension to update. */
 export const EXTENSION_ID = 'carlosperate.bbcmicrobit-micropython';
 
 /** The settings section, and the keys inside it, as the manifest declares them. */
@@ -37,28 +37,18 @@ export const PRODUCT = 'BBC micro:bit MicroPython';
 export const SERIAL_MONITOR_EXTENSION = 'eclipse-cdt.serial-monitor';
 
 /**
- * The extension that owns the board, the shared `BBC micro:bit` panel and the
- * mode switcher. This one builds a hex and hands it over; every byte that
+ * The extension that owns the board, the serial terminal and the micro:bit
+ * status bar menu. This one builds a hex and hands it over; every byte that
  * reaches a board goes through there.
  */
 export const MANAGER_EXTENSION = 'carlosperate.bbcmicrobit-manager';
 
-/** The lowest manager API this extension works against, as the types package versions it. */
-export const MANAGER_API_VERSION = '0.2.0';
-
-/** The mode this extension registers, and the segment label a user reads. */
-export const MODE_ID = 'micropython';
-export const MODE_LABEL = 'MicroPython';
-
-/** Set when the manager refused this extension, so the simulator can still show where the panel would be bare. */
-export const REFUSED_CONTEXT = 'bbcmicrobit-micropython.refused';
+/** The manager API this extension was built against, as the types package versions it. */
+export const MANAGER_API_VERSION = '0.3.0';
 
 /**
- * What gates the one view here: the manager naming this the active mode, or,
- * refused and with nothing else registered, the panel that would otherwise hold
- * only the manager's board buttons. The simulator needs no board.
+ * This extension's own activity bar container. No dot in it: the workbench
+ * schema for a container id is `/^[a-z0-9_-]+$/i`, and one that does not
+ * resolve sends its views to the Explorer with nothing but a log line.
  */
-export const MODE_WHEN = `bbcmicrobit-manager.activeMode == ${MODE_ID} || (${REFUSED_CONTEXT} && bbcmicrobit-manager.noModes)`;
-
-/** The shared activity bar container the manager declares. Never declared here. */
-export const CONTAINER_ID = 'bbcmicrobit';
+export const CONTAINER_ID = 'bbcmicrobit-micropython';

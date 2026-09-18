@@ -113,8 +113,8 @@ function seedSettings(dir) {
 }
 
 /**
- * A bench that remembers is a bench that lies: a collapsed section, a chosen
- * mode or an extension installed last time would all pass for the first run's
+ * A bench that remembers is a bench that lies: a collapsed section, a dismissed
+ * message or an extension installed last time would all pass for the first run's
  * behaviour. So every interactive launch starts as a fresh install. Only a
  * directory under one of the two bench roots above is ever removed, checked by
  * path. Anything else is refused, whatever asked for it.
