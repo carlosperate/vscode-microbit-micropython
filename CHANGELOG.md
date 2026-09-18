@@ -1,6 +1,6 @@
 # Release Notes
 
-## v0.4.0 - Unreleased
+## v0.4.0 - 2026/09/19
 
 - MicroPython has its own icon in the activity bar and its own side bar, the
   full height of the window. Its commands are still in the micro:bit menu in
