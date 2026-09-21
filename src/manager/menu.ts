@@ -16,6 +16,7 @@ const MENU: readonly string[] = [
 	COMMANDS.openSimulatorTerminal,
 	COMMANDS.saveHex,
 	COMMANDS.selectProjectFolder,
+	COMMANDS.createProject,
 ];
 
 export function menuGroup(context: vscode.ExtensionContext): MenuGroup {

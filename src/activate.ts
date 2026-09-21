@@ -13,6 +13,7 @@ import { COMMANDS, type CommandId } from './config';
 import { createLog, log } from './log';
 import { linkManager, type ManagerStatus } from './manager/link';
 import { menuGroup } from './manager/menu';
+import { createProject } from './project/create';
 import { createSerialMonitor } from './serial/eclipse';
 import { filesForSimulator, openSimulator, openSimulatorTerminal, runInSimulator } from './simulator/commands';
 import { createSimulator } from './simulator/view';
@@ -36,6 +37,7 @@ export function activateHost(context: vscode.ExtensionContext, entry: Entry): Ex
 	const simulator = createSimulator(context, () => filesForSimulator(context), manager);
 
 	const implemented: Record<CommandId, CommandHandler> = {
+		[COMMANDS.createProject]: createProject,
 		[COMMANDS.flash]: flash(manager),
 		[COMMANDS.saveHex]: saveHex(manager),
 		[COMMANDS.selectProjectFolder]: selectProjectFolder,

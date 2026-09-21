@@ -4,6 +4,7 @@
  * the micro:bit Foundation's `microbit.*` commands.
  */
 export const COMMANDS = {
+	createProject: 'bbcmicrobit-micropython.createProject',
 	flash: 'bbcmicrobit-micropython.flash',
 	saveHex: 'bbcmicrobit-micropython.saveHex',
 	selectProjectFolder: 'bbcmicrobit-micropython.selectProjectFolder',

@@ -1,5 +1,9 @@
 # Release Notes
 
+## v0.5.0 - Unreleased
+
+- Add **Create MicroPython Project** command to create a `main.py` file.
+
 ## v0.4.0 - 2026/09/19
 
 - MicroPython has its own icon in the activity bar and its own side bar, the

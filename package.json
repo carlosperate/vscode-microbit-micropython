@@ -101,6 +101,11 @@
     },
     "commands": [
       {
+        "command": "bbcmicrobit-micropython.createProject",
+        "title": "Create MicroPython Project",
+        "category": "BBC micro:bit MicroPython"
+      },
+      {
         "command": "bbcmicrobit-micropython.flash",
         "title": "Flash MicroPython Project",
         "category": "BBC micro:bit MicroPython"
