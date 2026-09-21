@@ -155,7 +155,7 @@ function report(from: vscode.Uri, selection: Selection): void {
 const REASONS: Record<SkipReason, string> = {
 	dotfile: 'name starts with a dot',
 	excluded: 'excluded by settings',
-	'build-output': 'a .hex build output',
+	'build-output': 'a .hex or .map build output',
 	'name-too-long': `name longer than ${MAX_FILENAME_BYTES} bytes`,
 	'name-has-slash': 'name contains a slash',
 	empty: 'file is empty',

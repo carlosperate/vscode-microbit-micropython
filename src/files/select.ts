@@ -65,7 +65,7 @@ export async function selectFiles(
 		}
 
 		// Build outputs cannot fit on the device and FAT may return their names uppercased.
-		if (name.toLowerCase().endsWith('.hex')) {
+		if (/\.(hex|map)$/i.test(name)) {
 			skipped.push({ name, reason: 'build-output', notable: false });
 			continue;
 		}

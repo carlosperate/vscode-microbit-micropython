@@ -52,8 +52,12 @@ extension's.
 
 Every file in your micro:bit project folder goes on the board, not only
 `main.py` and not only `.py` files. The default exceptions are: files inside
-folders, dot files, and `.hex` files.
+folders, dot files, and `.hex` or `.map` files.
 The micro:bit internal filesystem is flat, so it cannot contain folders.
+
+Add further exclusions in Settings with `bbcmicrobit-micropython.files.exclude`,
+using patterns such as `*.md` or `notes.txt`. This list defaults to empty;
+the built-in exclusions always apply.
 
 The project folder is the whole workspace by default. If your code lives in a
 subfolder, run the **Select MicroPython Project Folder** command to select it.

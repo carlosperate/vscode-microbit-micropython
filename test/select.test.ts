@@ -123,19 +123,17 @@ describe('folders', () => {
 	});
 });
 
-describe('a hex in the workspace', () => {
-	it('is left out, because it is what this extension puts there', async () => {
-		// Saving with no download bridge writes the hex beside the code. Taken back
-		// in, it is orders of magnitude past the device filesystem, so the next
-		// build is refused over a file the user never created.
-		const selection = await select(bench);
+describe.each(['hex', 'map'])('a .%s build output in the workspace', (extension) => {
+	it('is left out without a configured exclusion', async () => {
+		const name = `project.${extension}`;
+		const selection = await select({ 'main.py': 'x = 1', [name]: 'build output' });
 
-		expect(names(selection.files)).not.toContain('project.hex');
-		expect(selection.skipped).toContainEqual({ name: 'project.hex', reason: 'build-output', notable: false });
+		expect(names(selection.files)).toEqual(['main.py']);
+		expect(selection.skipped).toContainEqual({ name, reason: 'build-output', notable: false });
 	});
 
 	it('is left out whatever the case, since a name off a FAT drive shouts', async () => {
-		const selection = await select({ 'main.py': 'x = 1', 'PROJECT.HEX': ':00000001FF' });
+		const selection = await select({ 'main.py': 'x = 1', [`PROJECT.${extension.toUpperCase()}`]: 'build output' });
 
 		expect(names(selection.files)).toEqual(['main.py']);
 	});
@@ -146,7 +144,7 @@ describe('a hex in the workspace', () => {
 		await selectFiles(
 			async () => [
 				{ name: 'main.py', isDirectory: false },
-				{ name: 'project.hex', isDirectory: false },
+				{ name: `project.${extension}`, isDirectory: false },
 			],
 			readFile,
 			[]
