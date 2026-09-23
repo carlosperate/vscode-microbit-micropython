@@ -1,10 +1,29 @@
 import * as vscode from 'vscode';
 
 import { PRODUCT, SETTINGS, settingId } from '../config';
-import { MAX_FILENAME_BYTES, type SelectedFile, type Selection, type SkipReason } from '../files/select';
-import { chooseWorkspaceFolder, resolveProject, selectWorkspaceFiles, type Problem } from '../files/workspace';
+import {
+	MAX_FILENAME_BYTES,
+	looksEmpty,
+	type SelectedFile,
+	type Selection,
+	type SkipReason,
+} from '../files/select';
+import {
+	chooseWorkspaceFolder,
+	resolveProject,
+	selectWorkspaceFiles,
+	type Problem,
+	type Project,
+} from '../files/workspace';
 import { readFirmware } from '../hex/assets';
-import { buildFor, FirmwareError, StorageFullError, type BoardVersion, type Built } from '../hex/build';
+import {
+	buildFor,
+	checkSomeBoardFits,
+	FirmwareError,
+	StorageFullError,
+	type BoardVersion,
+	type Built,
+} from '../hex/build';
 import { log } from '../log';
 
 /** The files a target gets, and where they came from. */
@@ -18,13 +37,32 @@ export interface PreparedFiles {
 /** Those files built into a hex, and what it costs on the device. */
 export interface Prepared extends Built, PreparedFiles {}
 
-/** Whether there is a workspace at all. */
-function hasSomethingToBuild(): boolean {
-	if (vscode.workspace.workspaceFolders?.length) return true;
+/**
+ * The workspace folder and its project folder, or `undefined` once the user has
+ * been told why not. `nothingOpen` ends the sentence shown with no folder open.
+ */
+export async function openProject(
+	nothingOpen: string
+): Promise<{ folder: vscode.WorkspaceFolder; project: Project } | undefined> {
+	if (!vscode.workspace.workspaceFolders?.length) {
+		void vscode.window.showWarningMessage(`${PRODUCT}: open a folder first, ${nothingOpen}.`);
+		return undefined;
+	}
 
-	void vscode.window.showWarningMessage(`${PRODUCT}: open a folder first, there is nothing to run.`);
-	return false;
+	// Dismissing the pick is an answer, so it passes without a word.
+	const folder = await chooseWorkspaceFolder();
+	if (!folder) return undefined;
+
+	const project = await resolveProject(folder);
+	if (!project.ok) {
+		void vscode.window.showErrorMessage(`${PRODUCT}: ${explainProject(project.problem, project.named)}`);
+		return undefined;
+	}
+	return { folder, project };
 }
+
+/** A project folder as a message names it, the workspace root included. */
+export const folderName = (path: string) => (path ? `${path}/` : 'this folder');
 
 /** Omits the common workspace-root case from notifications. */
 export const projectClause = (prepared: PreparedFiles) => (prepared.project ? ` in ${prepared.project}/` : '');
@@ -45,17 +83,9 @@ export function listNames(files: readonly { name: string }[]): string {
  * telling.
  */
 export async function prepareFiles(context: vscode.ExtensionContext): Promise<PreparedFiles | undefined> {
-	if (!hasSomethingToBuild()) return undefined;
-
-	// Dismissing the pick is an answer, so it passes without a word.
-	const folder = await chooseWorkspaceFolder();
-	if (!folder) return undefined;
-
-	const project = await resolveProject(folder);
-	if (!project.ok) {
-		void vscode.window.showErrorMessage(`${PRODUCT}: ${explainProject(project.problem, project.named)}`);
-		return undefined;
-	}
+	const opened = await openProject('there is nothing to run');
+	if (!opened) return undefined;
+	const { folder, project } = opened;
 
 	// Browser-backed workspace reads can reject instead of returning an empty list.
 	let selection: Selection;
@@ -73,10 +103,12 @@ export async function prepareFiles(context: vscode.ExtensionContext): Promise<Pr
 
 	// Refuse before loading firmware when no selected file could use it.
 	if (selection.files.length === 0) {
-		const where = project.path ? `${project.path}/` : 'this folder';
-		void vscode.window.showWarningMessage(
-			`${PRODUCT}: no files to put on the board. Every file in ${where} was left out, see the output for why.`
-		);
+		const where = folderName(project.path);
+		// The output explains a left-out file, and has nothing to say about an empty folder.
+		const message = looksEmpty(selection)
+			? `${where} is empty. Run "${PRODUCT}: Create MicroPython Project" to start one.`
+			: `no files to put on the board. Every file in ${where} was left out, see the output for why.`;
+		void vscode.window.showWarningMessage(`${PRODUCT}: ${message}`);
 		return undefined;
 	}
 
@@ -103,17 +135,34 @@ export async function buildHex(
 ): Promise<Prepared | undefined> {
 	try {
 		const started = Date.now();
-		const built = await buildFor((version) => readFirmware(context.extensionUri, version), board, prepared.files);
+		const built = await buildFor(firmwareOf(context), board, prepared.files);
 		log(
 			`Built a ${board ?? 'universal'} hex of ${built.hex.length} bytes in ${Date.now() - started} ms, ` +
 				`using ${built.used} of ${built.available} bytes of storage`
 		);
 		return { ...built, ...prepared };
 	} catch (error) {
-		log(`Could not build the hex: ${String(error)}`);
-		void vscode.window.showErrorMessage(`${PRODUCT}: ${explain(error)}`);
+		refuse('Could not build the hex', error);
 		return undefined;
 	}
+}
+
+export async function fitsSomeBoard(context: vscode.ExtensionContext, prepared: PreparedFiles): Promise<boolean> {
+	try {
+		await checkSomeBoardFits(firmwareOf(context), prepared.files);
+		return true;
+	} catch (error) {
+		refuse('Refused before choosing a board', error);
+		return false;
+	}
+}
+
+const firmwareOf = (context: vscode.ExtensionContext) => (version: BoardVersion) =>
+	readFirmware(context.extensionUri, version);
+
+function refuse(logged: string, error: unknown): void {
+	log(`${logged}: ${String(error)}`);
+	void vscode.window.showErrorMessage(`${PRODUCT}: ${explain(error)}`);
 }
 
 /**

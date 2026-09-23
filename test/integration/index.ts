@@ -16,7 +16,7 @@ import {
 } from '../../src/config';
 import { chooseWorkspaceFolder, resolveProject, selectWorkspaceFiles } from '../../src/files/workspace';
 import { readFirmware } from '../../src/hex/assets';
-import { buildFs, generateHex } from '../../src/hex/build';
+import { buildFs, generateHex, ROOMIEST } from '../../src/hex/build';
 import { checkManager } from '../../src/manager/api';
 import { readSimulatorHtml } from '../../src/simulator/assets';
 import { commandFor } from '../../src/simulator/controls';
@@ -76,6 +76,7 @@ export async function run(): Promise<void> {
 	const built = await checkHexBuildsFromTheRealWorkspace(extension);
 	if (built) await checkTheHexSurvivesBeingSaved(built);
 	if (manager) await checkAFlashHandsTheManagerWhatItBuilt(extension, manager);
+	if (manager) await checkAnOversizedFlashAsksForNoBoard(extension, manager);
 	await checkSelectionFollowsTheProjectFolder();
 
 	// Last, and never in the middle. Replacing workspace folder 0 may terminate
@@ -493,14 +494,8 @@ async function checkAFlashHandsTheManagerWhatItBuilt(
 		},
 	};
 
-	// Only what `prepareHex` reads: the firmware's location and the omission memory.
-	const context = {
-		extensionUri: extension.extensionUri,
-		workspaceState: { get: () => undefined, update: () => Promise.resolve(), keys: () => [] },
-	} as unknown as vscode.ExtensionContext;
-
 	try {
-		await flash({ api: () => stub, status: { registered: true, problem: undefined } })(context);
+		await runFlash(extension, stub);
 	} catch (error) {
 		record(name, false, `Flash threw: ${String(error)}`);
 		return;
@@ -512,6 +507,50 @@ async function checkAFlashHandsTheManagerWhatItBuilt(
 		connects === 1 && hex !== undefined && hex.startsWith(':') && !holdsBothBoards(hex) && received?.expect === board,
 		`connect() called ${connects} time(s), flashHex got ${hex ? `${hex.length} characters of a ${holdsBothBoards(hex) ? 'universal' : 'single-board'} hex` : 'nothing'}, expect ${received?.expect === board ? 'is the board connect() answered' : JSON.stringify(received?.expect)}`
 	);
+}
+
+/** Flash against a stubbed manager, with only what it reads of the context: the firmware and the omission memory. */
+const runFlash = (extension: vscode.Extension<unknown>, stub: MicrobitManagerApi) =>
+	flash({ api: () => stub, status: { registered: true, problem: undefined } })({
+		extensionUri: extension.extensionUri,
+		workspaceState: { get: () => undefined, update: () => Promise.resolve(), keys: () => [] },
+	} as unknown as vscode.ExtensionContext);
+
+/** The file is sized off the roomiest board's own filesystem, never a number written here. */
+async function checkAnOversizedFlashAsksForNoBoard(
+	extension: vscode.Extension<unknown>,
+	manager: MicrobitManagerApi
+): Promise<void> {
+	const name = 'Flash refuses files no micro:bit can hold before asking for a board';
+	const root = benchRoot();
+	if (!root) {
+		record(name, false, 'no workspace folder to write into');
+		return;
+	}
+	const oversized = vscode.Uri.joinPath(root, 'oversized.bin');
+	if (await exists(oversized)) {
+		record(name, false, `${oversized} is already there, and is not this check's to overwrite`);
+		return;
+	}
+
+	let connects = 0;
+	const stub: MicrobitManagerApi = {
+		...manager,
+		connect: () => {
+			connects += 1;
+			return Promise.resolve(undefined);
+		},
+	};
+	try {
+		const room = buildFs([await readFirmware(extension.extensionUri, ROOMIEST)], []).getStorageSize();
+		await vscode.workspace.fs.writeFile(oversized, new Uint8Array(room + 1));
+		await runFlash(extension, stub);
+		record(name, connects === 0, `connect() called ${connects} time(s) for ${room + 1} bytes against ${room}`);
+	} catch (error) {
+		record(name, false, String(error));
+	} finally {
+		await remove(oversized);
+	}
 }
 
 /**

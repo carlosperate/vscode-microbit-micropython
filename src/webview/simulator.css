@@ -40,9 +40,14 @@ body {
 	height: 100%;
 }
 
+.board {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
 /* A button will not shrink below its label, so at the sidebar's minimum width
    one row overflows the view and grows a horizontal scrollbar unless it wraps. */
-.board,
 .controls {
 	display: flex;
 	flex-wrap: wrap;
@@ -85,7 +90,7 @@ body {
 }
 
 /* Every button here in VS Code's own variables, so they follow the theme. The
-   real board's row is the primary style; the simulator's strip and the sensor
+   real board's buttons are the primary style; the simulator's strip and the sensor
    panel's are secondary, so the two rows never read as one. */
 .board button,
 .controls button,
@@ -100,7 +105,6 @@ body {
 	cursor: pointer;
 }
 
-.board button,
 .controls button {
 	flex: 1;
 }

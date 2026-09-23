@@ -2,7 +2,10 @@
 
 ## v0.5.0 - Unreleased
 
-- Add **Create MicroPython Project** command to create a `main.py` file.
+- Add "Create MicroPython Project" command to create a `main.py` file.
+- Flash and terminal buttons are now in two separate lines.
+- A project too big for any micro:bit is refused before choosing a board.
+- An empty project folder says it is empty, and how to start a project.
 
 ## v0.4.0 - 2026/09/19
 

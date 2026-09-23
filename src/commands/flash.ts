@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { PRODUCT } from '../config';
 import { log } from '../log';
 import type { ManagerLink } from '../manager/link';
-import { buildHex, listNames, prepareFiles, projectClause } from './prepare';
+import { buildHex, fitsSomeBoard, listNames, prepareFiles, projectClause } from './prepare';
 
 /**
  * One flash at a time. Set before the first await: most of what this guards is
@@ -41,6 +41,9 @@ async function buildAndSend(context: vscode.ExtensionContext, manager: ManagerLi
 	// Before connecting: a folder with nothing to send must not cost a device chooser.
 	const files = await prepareFiles(context);
 	if (!files) return;
+
+	// Nor must files that no micro:bit could hold.
+	if (!(await fitsSomeBoard(context, files))) return;
 
 	// Undefined has been explained by the manager, or was a cancellation needing none.
 	const board = await api.connect();

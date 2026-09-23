@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
-import { PRODUCT, settingId, SETTINGS } from '../config';
-import { chooseWorkspaceFolder, resolveProject } from '../files/workspace';
+import { folderName, openProject } from '../commands/prepare';
+import { PRODUCT } from '../config';
 import { log } from '../log';
 import { MAIN, TEMPLATE } from './template';
 
@@ -12,22 +12,9 @@ import { MAIN, TEMPLATE } from './template';
  * program is not a mistake they can undo.
  */
 export async function createProject(): Promise<void> {
-	if (!vscode.workspace.workspaceFolders?.length) {
-		void vscode.window.showWarningMessage(`${PRODUCT}: open a folder first, there is nowhere to create a project.`);
-		return;
-	}
-
-	const workspace = await chooseWorkspaceFolder();
-	if (!workspace) return;
-
-	const project = await resolveProject(workspace);
-	if (!project.ok) {
-		void vscode.window.showErrorMessage(
-			`${PRODUCT}: ${settingId(SETTINGS.projectFolder)} names "${project.named}", which cannot be used, ` +
-				'so no project was created.'
-		);
-		return;
-	}
+	const opened = await openProject('there is nowhere to create a project');
+	if (!opened) return;
+	const { project } = opened;
 
 	const main = vscode.Uri.joinPath(project.uri, MAIN);
 	let present: boolean;
@@ -41,7 +28,7 @@ export async function createProject(): Promise<void> {
 	}
 
 	if (present) {
-		void vscode.window.showInformationMessage(`${PRODUCT}: ${named(project.path)} already has a ${MAIN}.`);
+		void vscode.window.showInformationMessage(`${PRODUCT}: ${folderName(project.path)} already has a ${MAIN}.`);
 	} else {
 		try {
 			await vscode.workspace.fs.writeFile(main, new TextEncoder().encode(TEMPLATE));
@@ -66,5 +53,4 @@ async function exists(uri: vscode.Uri): Promise<boolean> {
 	}
 }
 
-const named = (path: string) => (path === '' ? 'the workspace folder' : `${path}/`);
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));

@@ -33,6 +33,12 @@ export interface Selection {
 	skipped: Skipped[];
 }
 
+/** Nothing a user would call theirs: no files, no folders, and at most dotfiles such as `.vscode/`. */
+export const looksEmpty = (selection: Selection): boolean =>
+	selection.files.length === 0 &&
+	selection.folders.length === 0 &&
+	selection.skipped.every((skip) => skip.reason === 'dotfile');
+
 /** Readers cannot enter subfolders; `PromiseLike` accepts VS Code's `Thenable`. */
 type ReadDir = () => PromiseLike<DirEntry[]>;
 type ReadFile = (name: string) => PromiseLike<Uint8Array>;

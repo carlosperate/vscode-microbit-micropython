@@ -14,11 +14,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { type SelectedFile } from '../src/files/select';
 import {
+	BOARDS,
 	buildFor,
 	buildFs,
+	checkSomeBoardFits,
 	createFirmwareCache,
 	FirmwareError,
 	generateHex,
+	ROOMIEST,
 	StorageFullError,
 	type BoardVersion,
 	type Firmware,
@@ -189,6 +192,35 @@ describe('capacity', () => {
 		const refuse = () => generateHex(fs, microbitBoardId.V2);
 		expect(refuse).toThrow(StorageFullError);
 		expect(refuse).toThrow(String(fs.getStorageSize()));
+	});
+});
+
+/** Sound only if the board it measures really is the roomiest, held first, against the real images. */
+describe('refusing before a board is chosen', () => {
+	const room = async (version: BoardVersion) => buildFs([await firmware(version)], []).getStorageSize();
+
+	it('measures the board that really has the most room', async () => {
+		const roomiest = await room(ROOMIEST);
+		for (const version of BOARDS) expect(await room(version)).toBeLessThanOrEqual(roomiest);
+	});
+
+	it('refuses files no board can hold, with both numbers, reading only that one image', async () => {
+		const read = vi.fn<(version: BoardVersion) => Promise<Firmware>>(firmware);
+		const available = await room(ROOMIEST);
+		const refusal = checkSomeBoardFits(read, [file('big.bin', new Uint8Array(available + 1))]);
+
+		await expect(refusal).rejects.toThrow(StorageFullError);
+		await expect(refusal).rejects.toThrow(`no micro:bit has room for more than ${available}`);
+		expect(read.mock.calls.flat()).toEqual([ROOMIEST]);
+	});
+
+	it('lets through files the roomiest board holds even when a smaller one cannot', async () => {
+		const smaller = await firmware(BOARDS.find((version) => version !== ROOMIEST) as BoardVersion);
+		const files = [file('big.bin', new Uint8Array(buildFs([smaller], []).getStorageSize()))];
+		// Held first, or the pass below would be about files every board holds.
+		expect(() => generateHex(buildFs([smaller], files), smaller.boardId)).toThrow(StorageFullError);
+
+		await expect(checkSomeBoardFits(firmware, files)).resolves.toBeUndefined();
 	});
 });
 

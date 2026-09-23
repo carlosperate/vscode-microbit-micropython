@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { MAX_FILENAME_BYTES, selectFiles, type DirEntry } from '../src/files/select';
+import { looksEmpty, MAX_FILENAME_BYTES, selectFiles, type DirEntry } from '../src/files/select';
 
 /**
  * An in-memory workspace. A `null` value is a folder; a key with a slash is
@@ -232,5 +232,26 @@ describe('the exclude setting', () => {
 	it('can exclude everything', async () => {
 		const selection = await select(bench, ['*']);
 		expect(selection.files).toEqual([]);
+	});
+});
+
+/** Decides whether an empty selection is reported as an empty folder or as files left out. */
+describe('a folder that looks empty', () => {
+	it('is one with nothing in it', async () => {
+		expect(looksEmpty(await select({}))).toBe(true);
+	});
+
+	it('is one holding only dotfiles, such as the .vscode/ a setting creates', async () => {
+		expect(looksEmpty(await select({ '.vscode': null, '.gitignore': 'x' }))).toBe(true);
+	});
+
+	it('is not one whose files were all left out, since the output says why', async () => {
+		expect(looksEmpty(await select({ 'main.py': '' }))).toBe(false);
+		expect(looksEmpty(await select(bench, ['*']))).toBe(false);
+		expect(looksEmpty(await select({ 'project.hex': ':00000001FF' }))).toBe(false);
+	});
+
+	it('is not one holding only a folder', async () => {
+		expect(looksEmpty(await select({ lib: null }))).toBe(false);
 	});
 });

@@ -137,7 +137,7 @@ window.addEventListener('DOMContentLoaded', () => {
 	style.textContent = css;
 	document.head.append(style);
 	stage();
-	document.body.prepend(boardRow(), divider());
+	document.body.prepend(boardButtons(), divider());
 	document.body.append(controls(), loadedNote());
 	// The board boots with the document, so its state can arrive before this runs.
 	if (boardState !== undefined) buildSensors(boardState);
@@ -185,19 +185,19 @@ function stage(): void {
 }
 
 /** The real board's buttons lead: they are what a MicroPython user came for. */
-function boardRow(): HTMLElement {
-	const row = document.createElement('div');
-	row.className = 'board';
-	row.setAttribute('role', 'group');
-	row.setAttribute('aria-label', 'micro:bit');
+function boardButtons(): HTMLElement {
+	const group = document.createElement('div');
+	group.className = 'board';
+	group.setAttribute('role', 'group');
+	group.setAttribute('aria-label', 'micro:bit');
 	const flash = button('Flash project', () => send({ kind: 'control', control: 'flash' }));
 	flash.title = 'Build a MicroPython hex from the project folder and flash it to a connected micro:bit.';
 	flash.prepend(icon(ZAP));
 	const serial = button('Serial terminal', () => send({ kind: 'control', control: 'serial' }));
 	serial.title = 'Open a serial terminal on a connected micro:bit.';
 	serial.prepend(icon(TERMINAL));
-	row.append(flash, serial);
-	return row;
+	group.append(flash, serial);
+	return group;
 }
 
 /** Between the real board's buttons and the simulated board, saying which is which. */

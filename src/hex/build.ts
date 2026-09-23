@@ -62,15 +62,17 @@ const IMAGES: Record<BoardVersion, { file: string; boardId: microbitBoardId }> =
 };
 
 /** Every board there is an image for, derived so adding one reaches every build. */
-const BOARDS = Object.keys(IMAGES) as BoardVersion[];
+export const BOARDS = Object.keys(IMAGES) as BoardVersion[];
+
+/** The board whose filesystem has the most room, held to that by a test over the real images. */
+export const ROOMIEST: BoardVersion = 'V1';
 
 /** The images ship in the VSIX, so anything wrong with one is an install away. */
 const REINSTALL = 'Reinstalling the extension should restore it.';
 
 /**
- * Reads each image at most once. Every image is over half a megabyte and a
- * session usually needs only one of them, so nothing is read until a build asks
- * for that board.
+ * Reads each image at most once. Every image is over half a megabyte, so nothing
+ * is read until something asks for that board.
  */
 export function createFirmwareCache(read: ReadImage): (version: BoardVersion) => Promise<Firmware> {
 	// Holds the in-flight promise, not the result, so two builds started together
@@ -143,9 +145,11 @@ export function buildFs(images: readonly Firmware[], files: readonly SelectedFil
  * before generating saves assembling a megabyte of hex to throw away.
  */
 export function generateHex(fs: MicropythonFsHex, boardId?: microbitBoardId): Built {
+	const room =
+		boardId === undefined ? 'a hex that runs on every micro:bit has room for' : 'this micro:bit has room for';
+	assertRoom(fs, room);
 	const used = fs.getStorageUsed();
 	const available = fs.getStorageSize();
-	if (fs.getStorageRemaining() < 0) throw tooBig(used, available, boardId);
 
 	try {
 		const hex = boardId === undefined ? fs.getUniversalHex() : fs.getIntelHex(boardId);
@@ -156,7 +160,7 @@ export function generateHex(fs: MicropythonFsHex, boardId?: microbitBoardId): Bu
 		// different ones for a full filesystem, depending on whether any chunk was
 		// free at all when it started.
 		const reason = String(error);
-		if (/storage space|enough space/i.test(reason)) throw tooBig(used, available, boardId);
+		if (/storage space|enough space/i.test(reason)) throw tooBig(used, available, room);
 		if (/board id requested not found/i.test(reason)) {
 			throw new FirmwareError(
 				`There is no MicroPython image for this micro:bit (board id 0x${boardId?.toString(16)}). ` +
@@ -170,7 +174,7 @@ export function generateHex(fs: MicropythonFsHex, boardId?: microbitBoardId): Bu
 /**
  * A hex for one board when its version is known, and one that runs on every
  * board there is an image for when it is not. Only what the target needs is
- * read, so a flash to a V2 never touches the V1 image or its half a megabyte.
+ * read, so a build for a V2 never touches the V1 image or its half a megabyte.
  */
 export async function buildFor(
 	read: (version: BoardVersion) => PromiseLike<Firmware>,
@@ -188,11 +192,24 @@ export async function buildFor(
 	return generateHex(buildFs(images, files));
 }
 
-/** The sentence says which of the two builds the figures are about. */
-function tooBig(used: number, available: number, boardId: microbitBoardId | undefined): StorageFullError {
-	const room =
-		boardId === undefined ? 'a hex that runs on every micro:bit has room for' : 'this micro:bit has room for';
+/**
+ * Files too big for the roomiest board fit no board, so they are refused before
+ * anyone has to choose one. Files that fit it still meet the exact check once
+ * the board is known, since a smaller board can be too small for them.
+ */
+export async function checkSomeBoardFits(
+	read: (version: BoardVersion) => PromiseLike<Firmware>,
+	files: readonly SelectedFile[]
+): Promise<void> {
+	assertRoom(buildFs([await read(ROOMIEST)], files), 'no micro:bit has room for more than');
+}
 
+/** `room` finishes the sentence, saying whose room the second figure is. */
+function assertRoom(fs: MicropythonFsHex, room: string): void {
+	if (fs.getStorageRemaining() < 0) throw tooBig(fs.getStorageUsed(), fs.getStorageSize(), room);
+}
+
+function tooBig(used: number, available: number, room: string): StorageFullError {
 	return new StorageFullError(
 		used,
 		available,
