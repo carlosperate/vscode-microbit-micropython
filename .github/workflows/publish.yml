@@ -54,10 +54,11 @@ jobs:
         run: xvfb-run -a npm run test:integration:desktop
 
       # Name and version from package.json, on release the check above matches the version to the tag.
+      # vscode.dev refuses github.com/raw images (a 302 with no CORP header), raw.githubusercontent.com serves them.
       - name: Package VSIX
         run: |
           VSIX_NAME="$(node -p "require('./package.json').name")-$(node -p "require('./package.json').version").vsix"
-          npx --yes @vscode/vsce package --out "$VSIX_NAME"
+          npx --yes @vscode/vsce package --out "$VSIX_NAME" --baseImagesUrl https://raw.githubusercontent.com/carlosperate/vscode-microbit-micropython/HEAD/
           echo "VSIX_NAME=$VSIX_NAME" >> "$GITHUB_ENV"
 
       - name: Upload VSIX as workflow artifact
