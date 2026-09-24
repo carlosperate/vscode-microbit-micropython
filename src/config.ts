@@ -11,6 +11,7 @@ export const COMMANDS = {
 	openSimulator: 'bbcmicrobit-micropython.openSimulator',
 	runInSimulator: 'bbcmicrobit-micropython.runInSimulator',
 	openSimulatorTerminal: 'bbcmicrobit-micropython.openSimulatorTerminal',
+	showAllActions: 'bbcmicrobit-micropython.showAllActions',
 } as const;
 
 export type CommandId = (typeof COMMANDS)[keyof typeof COMMANDS];
@@ -53,3 +54,11 @@ export const MANAGER_API_VERSION = '0.3.0';
  * resolve sends its views to the Explorer with nothing but a log line.
  */
 export const CONTAINER_ID = 'bbcmicrobit-micropython';
+
+/** The view above the simulator, whose native buttons act on a real board. */
+export const BOARD_VIEW_ID = 'bbcmicrobit-micropython.board';
+
+export const SIMULATOR_VIEW_ID = 'bbcmicrobit-micropython.simulator';
+
+/** Opens the status bar menu, which lists every command of ours alongside the manager's. */
+export const MANAGER_MENU_COMMAND = 'bbcmicrobit-manager.showMenu';

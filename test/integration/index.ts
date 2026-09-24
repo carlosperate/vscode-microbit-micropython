@@ -5,14 +5,17 @@ import * as vscode from 'vscode';
 import type { ExtensionApi } from '../../src/activate';
 import { flash } from '../../src/commands/flash';
 import {
+	BOARD_VIEW_ID,
 	CONTAINER_ID,
 	EXTENSION_ID,
 	MANAGER_API_VERSION,
+	MANAGER_MENU_COMMAND,
 	MANAGER_EXTENSION,
 	PRODUCT,
 	SECTION,
 	SERIAL_MONITOR_EXTENSION,
 	SETTINGS,
+	SIMULATOR_VIEW_ID,
 } from '../../src/config';
 import { chooseWorkspaceFolder, resolveProject, selectWorkspaceFiles } from '../../src/files/workspace';
 import { readFirmware } from '../../src/hex/assets';
@@ -21,7 +24,6 @@ import { checkManager } from '../../src/manager/api';
 import { readSimulatorHtml } from '../../src/simulator/assets';
 import { commandFor } from '../../src/simulator/controls';
 import { SHELL_CONTROLS } from '../../src/simulator/protocol';
-import { VIEW_ID } from '../../src/simulator/view';
 
 /**
  * The integration tests: the same bundle run on two hosts, `@vscode/test-web` in
@@ -71,7 +73,7 @@ export async function run(): Promise<void> {
 	checkEveryCommandSaysWhoOwnsIt(extension);
 	await checkSerialMonitorCompanion();
 	const manager = await checkTheManagerIsLinked(exported);
-	await checkTheDocumentButtonsRunRealCommands(manager);
+	await checkTheButtonsRunRealCommands(extension, manager);
 	await checkSelectionOnTheRealWorkspace();
 	const built = await checkHexBuildsFromTheRealWorkspace(extension);
 	if (built) await checkTheHexSurvivesBeingSaved(built);
@@ -163,29 +165,30 @@ async function checkTheSimulatorShips(extension: vscode.Extension<unknown>): Pro
 }
 
 /**
- * The simulator's view in this extension's own container, with no `when`. A
- * container id that does not resolve sends the view to the Explorer with nothing
- * but a log line, and the workbench registers a `.focus` command per view and
- * container only once it has accepted them, so this asks it rather than the JSON.
+ * The button view and the simulator's, in this extension's own container, with
+ * no `when`. A container id that does not resolve sends the views to the Explorer
+ * with nothing but a log line, and the workbench registers a `.focus` command per
+ * view and container only once it has accepted them, so this asks it rather than the JSON.
  */
 async function checkTheSidebarIsItsOwn(extension: vscode.Extension<unknown>): Promise<void> {
 	const containers: { id?: string; title?: string }[] = extension.packageJSON?.contributes?.viewsContainers?.activitybar ?? [];
 	const views: { id?: string; type?: string; when?: string }[] =
 		extension.packageJSON?.contributes?.views?.[CONTAINER_ID] ?? [];
 	record(
-		'the simulator is the one view in a container of our own',
+		'the buttons and the simulator are the views in a container of our own',
 		containers.length === 1 &&
 			containers[0]?.title === PRODUCT &&
-			views.length === 1 &&
-			views[0]?.id === VIEW_ID &&
-			views[0]?.type === 'webview' &&
-			views[0]?.when === undefined,
+			views.length === 2 &&
+			views[0]?.id === BOARD_VIEW_ID &&
+			views[1]?.id === SIMULATOR_VIEW_ID &&
+			views[1]?.type === 'webview' &&
+			views.every((view) => view.when === undefined),
 		`${containers.map((entry) => `${entry.id} "${entry.title}"`).join(', ') || 'no container'} holds ` +
 			`${views.map((view) => `${view.id} when ${view.when ?? 'always'}`).join(', ') || 'nothing'}`
 	);
 
 	const registered = await vscode.commands.getCommands(true);
-	const expected = [`workbench.view.extension.${CONTAINER_ID}`, `${VIEW_ID}.focus`];
+	const expected = [`workbench.view.extension.${CONTAINER_ID}`, `${BOARD_VIEW_ID}.focus`, `${SIMULATOR_VIEW_ID}.focus`];
 	const missing = expected.filter((command) => !registered.includes(command));
 	record(
 		'the workbench registered the container and the view',
@@ -331,23 +334,32 @@ async function checkTheManagerIsLinked(exported: ExtensionApi | undefined): Prom
 }
 
 /**
- * The document's buttons post a control the view turns into a command, ours or
- * the manager's, so a wrong id is a button that logs and does nothing. Only a
- * real host knows which commands exist, so the mapping is checked against it here.
+ * Welcome content is markdown, so the manager's command ids are spelled out in
+ * our manifest, and the simulator document's buttons post a control the view
+ * maps to a command. A wrong id either way is a button that does nothing, and
+ * only a real host knows which commands exist.
  */
-async function checkTheDocumentButtonsRunRealCommands(manager: MicrobitManagerApi | undefined): Promise<void> {
+async function checkTheButtonsRunRealCommands(
+	extension: vscode.Extension<unknown>,
+	manager: MicrobitManagerApi | undefined
+): Promise<void> {
 	const registered = await vscode.commands.getCommands(true);
-	const mapped = SHELL_CONTROLS.map((control) => ({
-		control,
-		command: commandFor(control, () => manager?.commands.openTerminal),
-	})).filter((entry): entry is { control: (typeof SHELL_CONTROLS)[number]; command: string } => !!entry.command);
-	const unknown = mapped.filter((entry) => !registered.includes(entry.command));
+	const welcome: { contents?: string }[] = extension.packageJSON?.contributes?.viewsWelcome ?? [];
+	const linked = welcome.flatMap((entry) =>
+		[...(entry.contents ?? '').matchAll(/\(command:([^)]+)\)/g)].map((match) => match[1])
+	);
+	const mapped = SHELL_CONTROLS.map((control) => commandFor(control)).filter((command): command is string => !!command);
+	const all = [...linked, ...mapped, MANAGER_MENU_COMMAND];
+	const unknown = all.filter((command) => !registered.includes(command));
 	record(
-		"the document's buttons run commands the host registered",
-		mapped.length === 3 && unknown.length === 0,
-		`${mapped.map((entry) => `${entry.control} runs ${entry.command}`).join('; ')}${
-			unknown.length ? `; unknown: ${unknown.map((entry) => entry.command).join(', ')}` : ''
-		}`
+		'every button in the sidebar runs a command the host registered',
+		linked.length === 2 && mapped.length === 1 && unknown.length === 0,
+		unknown.length ? `unknown: ${unknown.join(', ')}` : all.join(', ')
+	);
+	record(
+		'the serial terminal button runs the id the manager publishes',
+		!!manager && linked.includes(manager.commands.openTerminal),
+		`manager publishes ${manager?.commands.openTerminal ?? 'nothing'}`
 	);
 }
 

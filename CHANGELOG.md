@@ -1,6 +1,13 @@
 # Release Notes
 
-## v0.5.0 - Unreleased
+## v0.6.0 - Unreleased
+
+- The Flash and serial terminal buttons are native VS Code buttons, in a
+  section of their own above the simulator.
+- A **Show All Actions** icon on the buttons header opens the micro:bit
+  menu with every command.
+
+## v0.5.0 - 2026/09/23
 
 - Add "Create MicroPython Project" command to create a `main.py` file.
 - Flash and terminal buttons are now in two separate lines.

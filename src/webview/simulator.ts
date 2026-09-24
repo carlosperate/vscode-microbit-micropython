@@ -14,7 +14,6 @@ import {
 	type ToShell,
 } from '../simulator/protocol';
 import { clearValue, sensorControls, setValueFor, withChange, type Control } from '../simulator/sensors';
-import { icon, TERMINAL, ZAP } from './icons';
 import css from './simulator.css';
 
 // Prelude. Runs before upstream's scripts, which is the whole reason this file
@@ -137,7 +136,6 @@ window.addEventListener('DOMContentLoaded', () => {
 	style.textContent = css;
 	document.head.append(style);
 	stage();
-	document.body.prepend(boardButtons(), divider());
 	document.body.append(controls(), loadedNote());
 	// The board boots with the document, so its state can arrive before this runs.
 	if (boardState !== undefined) buildSensors(boardState);
@@ -182,33 +180,6 @@ function stage(): void {
 	box.className = 'stage';
 	board.before(box);
 	box.append(board, play);
-}
-
-/** The real board's buttons lead: they are what a MicroPython user came for. */
-function boardButtons(): HTMLElement {
-	const group = document.createElement('div');
-	group.className = 'board';
-	group.setAttribute('role', 'group');
-	group.setAttribute('aria-label', 'micro:bit');
-	const flash = button('Flash project', () => send({ kind: 'control', control: 'flash' }));
-	flash.title = 'Build a MicroPython hex from the project folder and flash it to a connected micro:bit.';
-	flash.prepend(icon(ZAP));
-	const serial = button('Serial terminal', () => send({ kind: 'control', control: 'serial' }));
-	serial.title = 'Open a serial terminal on a connected micro:bit.';
-	serial.prepend(icon(TERMINAL));
-	group.append(flash, serial);
-	return group;
-}
-
-/** Between the real board's buttons and the simulated board, saying which is which. */
-function divider(): HTMLElement {
-	const rule = document.createElement('div');
-	rule.className = 'divider';
-	rule.setAttribute('role', 'separator');
-	const label = document.createElement('span');
-	label.textContent = 'Simulator';
-	rule.append(label);
-	return rule;
 }
 
 /** Run in Simulator on a board that has never started must not look like nothing happened. */

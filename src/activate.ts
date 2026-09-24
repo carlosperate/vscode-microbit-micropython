@@ -6,10 +6,11 @@
  */
 import * as vscode from 'vscode';
 
+import { createBoardPanel } from './board/panel';
 import { flash } from './commands/flash';
 import { saveHex } from './commands/saveHex';
 import { selectProjectFolder } from './commands/selectProjectFolder';
-import { COMMANDS, type CommandId } from './config';
+import { COMMANDS, MANAGER_MENU_COMMAND, type CommandId } from './config';
 import { createLog, log } from './log';
 import { linkManager, type ManagerStatus } from './manager/link';
 import { menuGroup } from './manager/menu';
@@ -34,7 +35,8 @@ export function activateHost(context: vscode.ExtensionContext, entry: Entry): Ex
 
 	createSerialMonitor(context);
 	const manager = linkManager(context, menuGroup(context));
-	const simulator = createSimulator(context, () => filesForSimulator(context), manager);
+	createBoardPanel(context);
+	const simulator = createSimulator(context, () => filesForSimulator(context));
 
 	const implemented: Record<CommandId, CommandHandler> = {
 		[COMMANDS.createProject]: createProject,
@@ -44,6 +46,10 @@ export function activateHost(context: vscode.ExtensionContext, entry: Entry): Ex
 		[COMMANDS.openSimulator]: openSimulator(simulator),
 		[COMMANDS.runInSimulator]: runInSimulator(simulator),
 		[COMMANDS.openSimulatorTerminal]: openSimulatorTerminal(simulator),
+		// Ours only for the title bar's icon and tooltip, which the manager's command lacks.
+		[COMMANDS.showAllActions]: async () => {
+			await vscode.commands.executeCommand(MANAGER_MENU_COMMAND);
+		},
 	};
 
 	for (const id of Object.values(COMMANDS)) {

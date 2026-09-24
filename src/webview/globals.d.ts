@@ -6,9 +6,3 @@ declare module '*.css' {
 	const css: string;
 	export default css;
 }
-
-/** The same loader for the icon glyphs, kept as the unchanged files they were copied from. */
-declare module '*.svg' {
-	const markup: string;
-	export default markup;
-}

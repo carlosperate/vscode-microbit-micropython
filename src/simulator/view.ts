@@ -4,9 +4,8 @@
  */
 import * as vscode from 'vscode';
 
-import { PRODUCT } from '../config';
+import { PRODUCT, SIMULATOR_VIEW_ID } from '../config';
 import { log } from '../log';
-import type { ManagerLink } from '../manager/link';
 import type { SerialTransport } from '../serial/types';
 import { readSimulatorHtml, simulatorAssets } from './assets';
 import { SimulatorTransport, type SimulatorLink } from './connection';
@@ -15,7 +14,6 @@ import { commandFor } from './controls';
 import type { EncodedFile, FromShell, SimulatorMessage, ToShell } from './protocol';
 import { ReadyGate, type Readiness } from './ready';
 
-export const VIEW_ID = 'bbcmicrobit-micropython.simulator';
 
 /** Generous: the shell reports at DOMContentLoaded, long before any WebAssembly runs. */
 const READY_TIMEOUT_MS = 10 * 1000;
@@ -42,11 +40,7 @@ export type ProvideFiles = () => Promise<EncodedFile[] | undefined>;
  * singleton survives `deactivate()`, so a second activation in the same host,
  * which is what the integration tests do, would inherit the first one's view.
  */
-export function createSimulator(
-	context: vscode.ExtensionContext,
-	provideFiles: ProvideFiles,
-	manager: ManagerLink
-): Simulator {
+export function createSimulator(context: vscode.ExtensionContext, provideFiles: ProvideFiles): Simulator {
 	let current: vscode.WebviewView | undefined;
 	const gate = new ReadyGate();
 
@@ -117,7 +111,7 @@ export function createSimulator(
 			case 'control': {
 				log(`Simulator: ${message.control} pressed`);
 				// The document's buttons run the same commands as the palette, so the two cannot drift.
-				const command = commandFor(message.control, () => manager.api()?.commands.openTerminal);
+				const command = commandFor(message.control);
 				if (command) {
 					void vscode.commands
 						.executeCommand(command)
@@ -170,7 +164,7 @@ export function createSimulator(
 		webview.html = failed();
 	}
 
-	const registration = vscode.window.registerWebviewViewProvider(VIEW_ID, provider, {
+	const registration = vscode.window.registerWebviewViewProvider(SIMULATOR_VIEW_ID, provider, {
 		// Not optional: without it the document is deallocated when the view is
 		// hidden and rebuilt when it returns, so the running program is gone.
 		webviewOptions: { retainContextWhenHidden: true },
@@ -181,7 +175,7 @@ export function createSimulator(
 		// `<viewId>.focus` is VS Code's own, and the only way to reveal a view
 		// that has never been resolved and so has no `show()` to call.
 		if (!current) {
-			await vscode.commands.executeCommand(`${VIEW_ID}.focus`);
+			await vscode.commands.executeCommand(`${SIMULATOR_VIEW_ID}.focus`);
 			return;
 		}
 		current.show(true);

@@ -26,11 +26,10 @@ export type ToShell =
 	| { kind: 'terminal'; open: boolean };
 
 /**
- * The document's buttons. `flash` and `serial` are the real board's and run
- * through the manager; `terminal` is the simulator's REPL; the rest never leave
- * the document and are reported so the extension can log them.
+ * The document's buttons. `terminal` opens the simulator's REPL; the rest never
+ * leave the document and are reported so the extension can log them.
  */
-export const SHELL_CONTROLS = ['stop', 'reset', 'sound', 'terminal', 'flash', 'serial'] as const;
+export const SHELL_CONTROLS = ['stop', 'reset', 'sound', 'terminal'] as const;
 export type ShellControl = (typeof SHELL_CONTROLS)[number];
 
 /**

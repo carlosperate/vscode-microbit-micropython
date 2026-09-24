@@ -134,6 +134,12 @@
         "command": "bbcmicrobit-micropython.openSimulatorTerminal",
         "title": "Open Simulator Terminal",
         "category": "BBC micro:bit MicroPython"
+      },
+      {
+        "command": "bbcmicrobit-micropython.showAllActions",
+        "title": "Show All Actions",
+        "category": "BBC micro:bit MicroPython",
+        "icon": "$(list-flat)"
       }
     ],
     "viewsContainers": {
@@ -148,10 +154,38 @@
     "views": {
       "bbcmicrobit-micropython": [
         {
-          "id": "bbcmicrobit-micropython.simulator",
+          "id": "bbcmicrobit-micropython.board",
           "name": "BBC micro:bit MicroPython",
+          "icon": "assets/activitybar.svg",
+          "initialSize": 1
+        },
+        {
+          "id": "bbcmicrobit-micropython.simulator",
+          "name": "MicroPython Simulator",
           "type": "webview",
-          "icon": "assets/activitybar.svg"
+          "icon": "assets/activitybar.svg",
+          "initialSize": 99
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "bbcmicrobit-micropython.board",
+        "contents": "[$(zap) Flash MicroPython project](command:bbcmicrobit-micropython.flash)\n[$(terminal) Open serial terminal](command:bbcmicrobit-manager.openTerminal)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "bbcmicrobit-micropython.showAllActions",
+          "when": "view == bbcmicrobit-micropython.board",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "bbcmicrobit-micropython.showAllActions",
+          "when": "false"
         }
       ]
     }

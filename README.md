@@ -4,7 +4,7 @@ Build and flash a MicroPython project to a BBC micro:bit, connect to the device
 serial and REPL, or run your code in the built-in simulator 🐍🤖.
 
 Works on VS Code and its web versions ([vscode.dev](https://vscode.dev)), in
-compatible editors, and without any additional local dependencies.
+compatible editors, without any additional local dependencies.
 
 <p align="center">
   <img src="assets/screenshot.png" alt="Extension screenshot" width="75%" align="center"/>
@@ -20,13 +20,16 @@ https://github.com/carlosperate/vscode-microbit-micropython/issues
 2. Click the **BBC micro:bit MicroPython** icon in the activity bar on the side and
   press play on the board there, your code will run on the simulator.
 3. To run it on a real board, plug in your micro:bit with a USB cable.
-4. Click the **Flash project** button.
+4. Click the **Flash MicroPython project** button, at the top of the same side
+  bar.
 5. Using non-Chromium browsers? Click on the micro:bit icon in the status bar
   at the bottom and choose **Save Hex** instead, then drag the saved
   file onto the `MICROBIT` drive that appears when you plug in the board.
-6. To talk to the board, click **Serial terminal** in the same panel, or choose
+6. To talk to the board, click **Open serial terminal** below it, or choose
   **Open Serial Terminal** from the status bar menu.
   Press `Ctrl+C` to interrupt the running program and get a MicroPython prompt.
+7. Every other command is one click away: hover over the buttons and click the
+  **Show All Actions** icon at the right of their header.
 
 ## What it does
 
@@ -106,6 +109,3 @@ MIT License.
 The micro:bit simulator is built from
 [micropython-microbit-v2-simulator](https://github.com/microbit-foundation/micropython-microbit-v2-simulator),
 under the MIT License.
-
-The flash and terminal icons on the panel's buttons come from Microsoft's
-[Codicons](https://github.com/microsoft/vscode-codicons), under CC BY 4.0.
