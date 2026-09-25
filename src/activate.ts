@@ -10,7 +10,7 @@ import { createBoardPanel } from './board/panel';
 import { flash } from './commands/flash';
 import { saveHex } from './commands/saveHex';
 import { selectProjectFolder } from './commands/selectProjectFolder';
-import { COMMANDS, MANAGER_MENU_COMMAND, type CommandId } from './config';
+import { COMMANDS, type CommandId } from './config';
 import { createLog, log } from './log';
 import { linkManager, type ManagerStatus } from './manager/link';
 import { menuGroup } from './manager/menu';
@@ -48,7 +48,8 @@ export function activateHost(context: vscode.ExtensionContext, entry: Entry): Ex
 		[COMMANDS.openSimulatorTerminal]: openSimulatorTerminal(simulator),
 		// Ours only for the title bar's icon and tooltip, which the manager's command lacks.
 		[COMMANDS.showAllActions]: async () => {
-			await vscode.commands.executeCommand(MANAGER_MENU_COMMAND);
+			const menu = manager.api()?.commands.showMenu;
+			if (menu) await vscode.commands.executeCommand(menu);
 		},
 	};
 

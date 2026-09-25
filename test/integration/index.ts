@@ -9,7 +9,6 @@ import {
 	CONTAINER_ID,
 	EXTENSION_ID,
 	MANAGER_API_VERSION,
-	MANAGER_MENU_COMMAND,
 	MANAGER_EXTENSION,
 	PRODUCT,
 	SECTION,
@@ -349,7 +348,7 @@ async function checkTheButtonsRunRealCommands(
 		[...(entry.contents ?? '').matchAll(/\(command:([^)]+)\)/g)].map((match) => match[1])
 	);
 	const mapped = SHELL_CONTROLS.map((control) => commandFor(control)).filter((command): command is string => !!command);
-	const all = [...linked, ...mapped, MANAGER_MENU_COMMAND];
+	const all = [...linked, ...mapped];
 	const unknown = all.filter((command) => !registered.includes(command));
 	record(
 		'every button in the sidebar runs a command the host registered',

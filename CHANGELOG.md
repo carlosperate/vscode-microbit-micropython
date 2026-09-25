@@ -6,6 +6,7 @@
   section of their own above the simulator.
 - A **Show All Actions** icon on the buttons header opens the micro:bit
   menu with every command.
+    - Uses BBC micro:bit Manager v0.3.1 (needs v0.3.0 or later).
 - Fix project description not loading images on vscode.dev.
 
 ## v0.5.0 - 2026/09/23

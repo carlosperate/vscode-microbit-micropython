@@ -46,7 +46,7 @@ export const SERIAL_MONITOR_EXTENSION = 'eclipse-cdt.serial-monitor';
 export const MANAGER_EXTENSION = 'carlosperate.bbcmicrobit-manager';
 
 /** The manager API this extension was built against, as the types package versions it. */
-export const MANAGER_API_VERSION = '0.3.0';
+export const MANAGER_API_VERSION = '0.3.1';
 
 /**
  * This extension's own activity bar container. No dot in it: the workbench
@@ -59,6 +59,3 @@ export const CONTAINER_ID = 'bbcmicrobit-micropython';
 export const BOARD_VIEW_ID = 'bbcmicrobit-micropython.board';
 
 export const SIMULATOR_VIEW_ID = 'bbcmicrobit-micropython.simulator';
-
-/** Opens the status bar menu, which lists every command of ours alongside the manager's. */
-export const MANAGER_MENU_COMMAND = 'bbcmicrobit-manager.showMenu';

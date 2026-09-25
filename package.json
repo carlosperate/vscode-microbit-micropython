@@ -37,7 +37,7 @@
     "esbuild": "^0.28.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11",
-    "vscode-bbcmicrobit-manager-api": "0.3.0"
+    "vscode-bbcmicrobit-manager-api": "0.3.1"
   },
   "engines": {
     "vscode": "^1.91.0"
