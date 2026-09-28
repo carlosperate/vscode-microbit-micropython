@@ -1,6 +1,6 @@
 # Release Notes
 
-## v0.6.0 - Unreleased
+## v0.6.0 - 2026/09/28
 
 - The Flash and serial terminal buttons are native VS Code buttons, in a
   section of their own above the simulator.
