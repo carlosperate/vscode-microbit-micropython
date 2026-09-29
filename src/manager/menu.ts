@@ -10,9 +10,8 @@ import { COMMANDS, CONTAINER_ID, PRODUCT } from '../config';
 
 const MENU: readonly string[] = [
 	COMMANDS.flash,
-	// Beside Flash, the other way to run the program; opening the simulator alone is the detour.
+	// Beside Flash, the other way to run the program.
 	COMMANDS.runInSimulator,
-	COMMANDS.openSimulator,
 	COMMANDS.openSimulatorTerminal,
 	COMMANDS.saveHex,
 	COMMANDS.selectProjectFolder,

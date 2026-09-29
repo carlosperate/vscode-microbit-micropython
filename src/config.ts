@@ -8,7 +8,6 @@ export const COMMANDS = {
 	flash: 'bbcmicrobit-micropython.flash',
 	saveHex: 'bbcmicrobit-micropython.saveHex',
 	selectProjectFolder: 'bbcmicrobit-micropython.selectProjectFolder',
-	openSimulator: 'bbcmicrobit-micropython.openSimulator',
 	runInSimulator: 'bbcmicrobit-micropython.runInSimulator',
 	openSimulatorTerminal: 'bbcmicrobit-micropython.openSimulatorTerminal',
 	showAllActions: 'bbcmicrobit-micropython.showAllActions',

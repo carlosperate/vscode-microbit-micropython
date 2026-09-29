@@ -10,9 +10,6 @@ import { encodeFiles, type EncodedFile } from './protocol';
 import type { Readiness } from './ready';
 import type { Simulator } from './view';
 
-/** One simulator, ever: revealed rather than opened a second time. */
-export const openSimulator = (simulator: Simulator) => (): Promise<void> => simulator.show();
-
 /**
  * The same selection, warnings and refusals as a flash, then the files
  * themselves rather than a hex: the simulator takes them as they are. No storage

@@ -16,7 +16,7 @@ import { linkManager, type ManagerStatus } from './manager/link';
 import { menuGroup } from './manager/menu';
 import { createProject } from './project/create';
 import { createSerialMonitor } from './serial/eclipse';
-import { filesForSimulator, openSimulator, openSimulatorTerminal, runInSimulator } from './simulator/commands';
+import { filesForSimulator, openSimulatorTerminal, runInSimulator } from './simulator/commands';
 import { createSimulator } from './simulator/view';
 
 export type CommandHandler = (context: vscode.ExtensionContext, ...args: unknown[]) => Promise<void>;
@@ -43,7 +43,6 @@ export function activateHost(context: vscode.ExtensionContext, entry: Entry): Ex
 		[COMMANDS.flash]: flash(manager),
 		[COMMANDS.saveHex]: saveHex(manager),
 		[COMMANDS.selectProjectFolder]: selectProjectFolder,
-		[COMMANDS.openSimulator]: openSimulator(simulator),
 		[COMMANDS.runInSimulator]: runInSimulator(simulator),
 		[COMMANDS.openSimulatorTerminal]: openSimulatorTerminal(simulator),
 		// Ours only for the title bar's icon and tooltip, which the manager's command lacks.

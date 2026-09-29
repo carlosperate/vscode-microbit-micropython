@@ -1,5 +1,10 @@
 # Release Notes
 
+## v0.7.0 - Unreleased
+
+- The "open simulator" command has been removed to keep the list lean, since
+  the "Run in simulator" command performs this as well.
+
 ## v0.6.0 - 2026/09/28
 
 - The Flash and serial terminal buttons are native VS Code buttons, in a
