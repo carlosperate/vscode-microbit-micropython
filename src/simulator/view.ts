@@ -43,6 +43,7 @@ export type ProvideFiles = () => Promise<EncodedFile[] | undefined>;
 export function createSimulator(context: vscode.ExtensionContext, provideFiles: ProvideFiles): Simulator {
 	let current: vscode.WebviewView | undefined;
 	const gate = new ReadyGate();
+	const ready = () => gate.wait(READY_TIMEOUT_MS);
 
 	// The terminal outlives any one document, so it listens here and not on a webview.
 	const messageListeners = new Set<(message: FromShell) => void>();
@@ -141,21 +142,25 @@ export function createSimulator(context: vscode.ExtensionContext, provideFiles: 
 		}
 	}
 
-	async function load(webview: vscode.Webview): Promise<void> {
-		gate.reset();
-		try {
-			const upstream = await readSimulatorHtml(context.extensionUri);
-			webview.html = simulatorDocument(upstream, {
-				assets: webview.asWebviewUri(simulatorAssets(context.extensionUri)).toString(),
-				script: webview
-					.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview', 'simulator.js'))
-					.toString(),
-				cspSource: webview.cspSource,
-			});
-		} catch (error) {
-			log(`Could not load the simulator: ${String(error)}`);
-			fail(webview, String(error));
-		}
+	/** Until the document is up: our own spinner cannot paint while the shell script downloads. */
+	function load(webview: vscode.Webview): Thenable<void> {
+		return vscode.window.withProgress({ location: { viewId: SIMULATOR_VIEW_ID } }, async () => {
+			gate.reset();
+			try {
+				const upstream = await readSimulatorHtml(context.extensionUri);
+				webview.html = simulatorDocument(upstream, {
+					assets: webview.asWebviewUri(simulatorAssets(context.extensionUri)).toString(),
+					script: webview
+						.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview', 'simulator.js'))
+						.toString(),
+					cspSource: webview.cspSource,
+				});
+			} catch (error) {
+				log(`Could not load the simulator: ${String(error)}`);
+				fail(webview, String(error));
+			}
+			await ready();
+		});
 	}
 
 	/** A blank view is indistinguishable from a hang, so the view says so and the gate says why. */
@@ -182,8 +187,6 @@ export function createSimulator(context: vscode.ExtensionContext, provideFiles: 
 		// A retained view is never resolved again on its own, so revealing retries a failed load.
 		if (gate.current()?.kind === 'failed') void load(current.webview);
 	}
-
-	const ready = () => gate.wait(READY_TIMEOUT_MS);
 
 	return {
 		dispose: () => registration.dispose(),

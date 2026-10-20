@@ -4,6 +4,8 @@
 
 - The "open simulator" command has been removed to keep the list lean, since
   the "Run in simulator" command performs this as well.
+- The simulator shows a loading spinner until the board appears, instead of
+  an empty panel on slower connections like vscode.dev.
 
 ## v0.6.0 - 2026/09/28
 

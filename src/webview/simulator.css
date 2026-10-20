@@ -1,3 +1,12 @@
+/* The board's viewBox, and its width once 55vh clamps its height. Shared by the
+   board and its spinner: `100%` resolves where it is used, the body's content
+   width for both a child's width and its margin. */
+:root {
+	--board-width: 191.27;
+	--board-height: 155.77;
+	--stage-width: min(100%, calc(55vh * var(--board-width) / var(--board-height)));
+}
+
 /* The board SVG carries a viewBox and no size, and there is no frame around it,
    so without a limit it grows to fill the whole view however tall that is.
 
@@ -14,6 +23,59 @@ body {
 	height: 100vh;
 }
 
+/* Until the shell has run, after the board's scripts, which are what take the
+   time. Pseudo-elements, since the shell adds no markup of its own before then. */
+:root:not(.ready) body {
+	align-items: center;
+	gap: 8px;
+}
+
+/* Upstream draws the board and its play button before the shell sizes them, so
+   a frame between the two would show them unsized beside the spinner. The
+   container's `display` is an inline style, hence visibility. */
+:root:not(.ready) body > svg {
+	display: none;
+}
+
+:root:not(.ready) .play-button-container {
+	visibility: hidden;
+}
+
+/* Half the board's height down, less half the ring, gap and text (about 40px),
+   so the spinner sits on the middle of where the board appears. */
+:root:not(.ready) body::before {
+	content: '';
+	margin-top: calc(var(--stage-width) * var(--board-height) / var(--board-width) / 2 - 20px);
+	box-sizing: border-box;
+	width: 16px;
+	height: 16px;
+	border: 2px solid var(--vscode-progressBar-background);
+	border-right-color: transparent;
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+}
+
+:root:not(.ready) body::after {
+	content: 'Loading simulator\2026';
+	color: var(--vscode-descriptionForeground);
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	/* Hidden rather than removed, since it carries the text's offset. */
+	:root:not(.ready) body::before {
+		animation: none;
+		visibility: hidden;
+	}
+}
+
 /* Everything above the sensors keeps its own height and gives up none of it. */
 .stage,
 .controls,
@@ -23,12 +85,12 @@ body {
 
 /* Upstream's play button is absolute at 100% of its nearest positioned
    ancestor, so this box is what centres and sizes it over the board. The box has
-   the board's own aspect ratio and narrows when 55vh clamps its height, so the
-   button never sizes off a wider letterboxed box. */
+   the board's own aspect ratio and narrows when its height limit clamps it, so
+   the button never sizes off a wider letterboxed box. */
 .stage {
 	position: relative;
-	aspect-ratio: 191.27 / 155.77;
-	width: min(100%, calc(55vh * 191.27 / 155.77));
+	aspect-ratio: var(--board-width) / var(--board-height);
+	width: var(--stage-width);
 	margin: 0 auto;
 }
 

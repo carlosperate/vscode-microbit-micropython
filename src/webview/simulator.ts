@@ -17,7 +17,13 @@ import { clearValue, sensorControls, setValueFor, withChange, type Control } fro
 import css from './simulator.css';
 
 // Prelude. Runs before upstream's scripts, which is the whole reason this file
-// is a blocking script in <head> and touches no DOM: there is no body yet.
+// is a blocking script in <head> and touches no body: there is none yet.
+
+// Styled from the first paint, so the spinner shows while upstream's scripts
+// download. Upstream's own <style> follows ours and shares no selector with it.
+const style = document.createElement('style');
+style.textContent = css;
+document.head.append(style);
 
 // `Notifications` captures window.parent once, at construction, and 1.91.1
 // leaves it undefined: the first notification throws without this.
@@ -132,9 +138,7 @@ let terminal: HTMLButtonElement | undefined;
 let note: HTMLElement | undefined;
 
 window.addEventListener('DOMContentLoaded', () => {
-	const style = document.createElement('style');
-	style.textContent = css;
-	document.head.append(style);
+	document.documentElement.classList.add('ready');
 	stage();
 	document.body.append(controls(), loadedNote());
 	// The board boots with the document, so its state can arrive before this runs.
